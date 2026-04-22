@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <!-- Compact favicon. Single inner cell on dark circle, no bolts or grid (too small to render). -->
+  <circle cx="16" cy="16" r="15" fill="#060606"/>
+  <circle cx="16" cy="16" r="13" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="1"/>
+  <circle cx="16" cy="16" r="6" fill="rgba(31,204,121,0.5)"/>
+  <circle cx="16" cy="16" r="3" fill="rgba(255,255,255,0.95)"/>
+</svg>

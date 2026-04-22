@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Petri app icon (512). Same motif scaled up with an extra branching edge hint for detail at larger sizes. -->
+  <rect width="512" height="512" rx="96" fill="#060606"/>
+  <g stroke="rgba(255,255,255,0.04)" stroke-width="1">
+    <line x1="128" y1="0" x2="128" y2="512"/>
+    <line x1="256" y1="0" x2="256" y2="512"/>
+    <line x1="384" y1="0" x2="384" y2="512"/>
+    <line x1="0" y1="128" x2="512" y2="128"/>
+    <line x1="0" y1="256" x2="512" y2="256"/>
+    <line x1="0" y1="384" x2="512" y2="384"/>
+  </g>
+  <!-- outer porthole ring -->
+  <circle cx="256" cy="256" r="192" fill="none" stroke="rgba(255,255,255,0.18)" stroke-width="8"/>
+  <!-- inner porthole ring -->
+  <circle cx="256" cy="256" r="176" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="3"/>
+  <!-- porthole dish -->
+  <circle cx="256" cy="256" r="166" fill="#0a0a0a"/>
+  <!-- mycelium edges (white low-opacity) -->
+  <path d="M256,256 Q300,220 330,180" stroke="rgba(255,255,255,0.18)" stroke-width="2" fill="none"/>
+  <path d="M256,256 Q210,290 170,300" stroke="rgba(255,255,255,0.18)" stroke-width="2" fill="none"/>
+  <path d="M256,256 Q290,310 320,330" stroke="rgba(255,255,255,0.12)" stroke-width="2" fill="none"/>
+  <!-- secondary cells (affinity dots) -->
+  <circle cx="330" cy="180" r="14" fill="rgba(100,200,255,0.45)"/>
+  <circle cx="330" cy="180" r="6"  fill="rgba(255,255,255,0.9)"/>
+  <circle cx="170" cy="300" r="12" fill="rgba(255,200,50,0.45)"/>
+  <circle cx="170" cy="300" r="5"  fill="rgba(255,255,255,0.85)"/>
+  <circle cx="320" cy="330" r="10" fill="rgba(255,120,100,0.4)"/>
+  <circle cx="320" cy="330" r="4"  fill="rgba(255,255,255,0.8)"/>
+  <!-- central cell glow -->
+  <circle cx="256" cy="256" r="90" fill="rgba(31,204,121,0.22)"/>
+  <circle cx="256" cy="256" r="60" fill="rgba(31,204,121,0.5)"/>
+  <circle cx="256" cy="256" r="28" fill="rgba(255,255,255,0.95)"/>
+  <!-- cardinal bolts -->
+  <circle cx="256" cy="60"  r="9" fill="rgba(255,255,255,0.25)"/>
+  <circle cx="452" cy="256" r="9" fill="rgba(255,255,255,0.25)"/>
+  <circle cx="256" cy="452" r="9" fill="rgba(255,255,255,0.25)"/>
+  <circle cx="60"  cy="256" r="9" fill="rgba(255,255,255,0.25)"/>
+</svg>
