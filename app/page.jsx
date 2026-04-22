@@ -35,6 +35,8 @@ const SHIPMENT_LABELS = {
 export default function Home() {
   const [screen, setScreen] = useState('lab');
   const [modalNodeId, setModalNodeId] = useState(null);
+  const [combineMode, setCombineMode] = useState(false);
+  const [combineSelectedId, setCombineSelectedId] = useState(null);
   const tick = useTick();
   const { animations, fire } = useAnimations();
 
@@ -56,6 +58,7 @@ export default function Home() {
   const containNode = useGameStore((s) => s.containNode);
   const discardNode = useGameStore((s) => s.discardNode);
   const harvestNode = useGameStore((s) => s.harvestNode);
+  const combineNodes = useGameStore((s) => s.combineNodes);
   const collectShipment = useGameStore((s) => s.collectShipment);
 
   // On mount: load saved state, then run offline sim once, then keep it
@@ -99,7 +102,30 @@ export default function Home() {
   };
 
   const handleNodeTap = (node) => {
+    // In combine mode: first tap selects, second tap on a *different* node
+    // fires the combine, second tap on the *same* node deselects.
+    if (combineMode) {
+      if (combineSelectedId == null) {
+        setCombineSelectedId(node.id);
+        return;
+      }
+      if (combineSelectedId === node.id) {
+        setCombineSelectedId(null);
+        return;
+      }
+      const result = combineNodes(activeDish.id, combineSelectedId, node.id);
+      if (result?.ok && result.events?.length) fire(result.events);
+      setCombineMode(false);
+      setCombineSelectedId(null);
+      return;
+    }
     setModalNodeId((current) => (current === node.id ? null : node.id));
+  };
+
+  const handleToggleCombine = () => {
+    setCombineMode((v) => !v);
+    setCombineSelectedId(null);
+    setModalNodeId(null);
   };
 
   const handleAction = (actionId, node) => {
@@ -186,7 +212,10 @@ export default function Home() {
               level={level}
               xpPercent={0}
               shipmentReady={readyShipment}
+              combineMode={combineMode}
+              combineSelectedId={combineSelectedId}
               onNodeTap={handleNodeTap}
+              onToggleCombine={handleToggleCombine}
               onCollectShipment={() => readyShipment && collectShipment(readyShipment.type)}
             />
           )}

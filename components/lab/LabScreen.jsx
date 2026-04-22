@@ -23,9 +23,12 @@ export function LabScreen({
   level = 1,
   xpPercent = 0,
   shipmentReady = null,
+  combineMode = false,
+  combineSelectedId = null,
   onNodeTap,
   onPetriSwitch,
   onCollectShipment,
+  onToggleCombine,
 }) {
   const stableCount = dish.nodes.filter((n) => n.state === 'stable').length;
   const stablePct = dish.nodes.length ? Math.round((stableCount / dish.nodes.length) * 100) : 0;
@@ -46,24 +49,42 @@ export function LabScreen({
           padding: '8px 16px',
         }}
       >
-        <button
-          onClick={onPetriSwitch}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 6,
-            padding: '5px 10px',
-            borderRadius: 10,
-            border: '1px solid rgba(255,255,255,0.1)',
-            background: 'rgba(255,255,255,0.04)',
-            color: CHROME.textBody,
-            fontFamily: MONO,
-            fontSize: 8,
-            letterSpacing: 0.5,
-          }}
-        >
-          ☰ {dish.name}
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <button
+            onClick={onPetriSwitch}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '5px 10px',
+              borderRadius: 10,
+              border: '1px solid rgba(255,255,255,0.1)',
+              background: 'rgba(255,255,255,0.04)',
+              color: CHROME.textBody,
+              fontFamily: MONO,
+              fontSize: 8,
+              letterSpacing: 0.5,
+            }}
+          >
+            ☰ {dish.name}
+          </button>
+          <button
+            onClick={onToggleCombine}
+            aria-pressed={combineMode}
+            style={{
+              padding: '5px 9px',
+              borderRadius: 10,
+              border: `1px solid ${combineMode ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.1)'}`,
+              background: combineMode ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.04)',
+              color: combineMode ? CHROME.textPrimary : CHROME.textBody,
+              fontFamily: MONO,
+              fontSize: 8,
+              letterSpacing: 0.5,
+            }}
+          >
+            {combineMode ? 'CANCEL' : '⇌ COMBINE'}
+          </button>
+        </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ color: CHROME.textMuted, fontSize: 8, fontFamily: MONO }}>
             LVL {level}
@@ -143,41 +164,68 @@ export function LabScreen({
         }}
       >
         <Porthole>
-          <PetriDish tick={tick} nodes={dish.nodes} onNodeTap={onNodeTap} />
+          <PetriDish
+            tick={tick}
+            nodes={dish.nodes}
+            onNodeTap={onNodeTap}
+            highlightedNodeId={combineSelectedId}
+          />
           <AnimOverlay animations={animations} nodes={dish.nodes} />
         </Porthole>
 
-        {/* dish stats — sits just below the porthole, moves with it */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 10,
-            marginTop: 14,
-          }}
-        >
-          {[
-            `DISH ${String(dish.id).padStart(2, '0')}`,
-            `${dish.nodes.length} NODES`,
-            `${stablePct}% STABLE`,
-          ].map((label, i) => (
-            <React.Fragment key={label}>
-              {i > 0 && (
-                <div style={{ width: 1, height: 10, background: 'rgba(255,255,255,0.1)' }} />
-              )}
-              <span
-                style={{
-                  color: 'rgba(255,255,255,0.2)',
-                  fontSize: 7.5,
-                  fontFamily: MONO,
-                }}
-              >
-                {label}
-              </span>
-            </React.Fragment>
-          ))}
-        </div>
+        {/* Below-porthole strip: dish stats normally, combine hint when armed */}
+        {combineMode ? (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginTop: 14,
+            }}
+          >
+            <span
+              style={{
+                color: 'rgba(255,255,255,0.5)',
+                fontSize: 8,
+                fontFamily: MONO,
+                letterSpacing: 1,
+              }}
+            >
+              {combineSelectedId == null ? '— TAP FIRST PARENT —' : '— TAP SECOND PARENT —'}
+            </span>
+          </div>
+        ) : (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 10,
+              marginTop: 14,
+            }}
+          >
+            {[
+              `DISH ${String(dish.id).padStart(2, '0')}`,
+              `${dish.nodes.length} NODES`,
+              `${stablePct}% STABLE`,
+            ].map((label, i) => (
+              <React.Fragment key={label}>
+                {i > 0 && (
+                  <div style={{ width: 1, height: 10, background: 'rgba(255,255,255,0.1)' }} />
+                )}
+                <span
+                  style={{
+                    color: 'rgba(255,255,255,0.2)',
+                    fontSize: 7.5,
+                    fontFamily: MONO,
+                  }}
+                >
+                  {label}
+                </span>
+              </React.Fragment>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

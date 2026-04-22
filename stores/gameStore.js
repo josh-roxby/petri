@@ -13,6 +13,7 @@ import {
   STABILISE_REDUCTION,
   applyDiscardCollateral,
   buildChildNode,
+  buildCombinedChildNode,
   clamp,
   cooldownRemaining,
   harvestOutcome,
@@ -402,6 +403,81 @@ export const useGameStore = create((set, get) => ({
     if (outcome.success) events.push({ type: 'H1', nodeId });
     if (outcome.consumed) events.push({ type: 'SH1', nodeId });
     return { ok: true, events, outcome };
+  },
+
+  /**
+   * Two-parent combine. Spawns a child inheriting from both parents (50/50
+   * blend with higher noise per spec §2). Costs 1× Basic Ingredient and
+   * puts both parents on catalyse cooldown so the action can't spam.
+   * Spec §6 mutation paths.
+   */
+  combineNodes: (dishId, aId, bId) => {
+    if (aId === bId) return { ok: false };
+    const state = get();
+    const dish = findDish(state, dishId);
+    if (!dish) return { ok: false };
+    const a = findNode(dish, aId);
+    const b = findNode(dish, bId);
+    if (!a || !b) return { ok: false };
+    if (state.materials.ingredient <= 0) return { ok: false };
+    const bad = (n) => n.state === 'scar' || n.state === 'harvested' || n.state === 'contained';
+    if (bad(a) || bad(b)) return { ok: false };
+    if (cooldownRemaining(a, 'catalyse') > 0 || cooldownRemaining(b, 'catalyse') > 0) {
+      return { ok: false };
+    }
+
+    let newChildId = null;
+    set((s) => {
+      const liveDish = findDish(s, dishId);
+      // Child seeks a free spot near the midpoint between the two parents.
+      const midAnchor = {
+        x: (a.x + b.x) / 2,
+        y: (a.y + b.y) / 2,
+        r: Math.max(a.r, b.r),
+      };
+      const position = pickChildPosition(midAnchor, liveDish.nodes);
+      const child = buildCombinedChildNode({
+        a,
+        b,
+        id: nextNodeId(liveDish),
+        position,
+        nodes: liveDish.nodes,
+      });
+      newChildId = child.id;
+      return {
+        materials: decrementMaterial(s.materials, 'ingredient'),
+        dishes: s.dishes.map((d) =>
+          d.id === dishId
+            ? {
+                ...d,
+                nodes: [
+                  ...d.nodes.map((n) =>
+                    n.id === aId || n.id === bId ? withCooldown(n, 'catalyse') : n
+                  ),
+                  child,
+                ],
+              }
+            : d
+        ),
+        journal: recordDiscovery(s.journal, {
+          name: child.name,
+          aff: child.aff,
+          tier: 1,
+          seed: hashNameSeed(child.name),
+        }),
+      };
+    });
+    get().save();
+    // T2 spark fires at both parents so the action has visual weight on
+    // both ends of the cross-pollination.
+    return {
+      ok: true,
+      events: [
+        { type: 'T2', nodeId: aId },
+        { type: 'T2', nodeId: bId },
+      ],
+      childId: newChildId,
+    };
   },
 
   /**

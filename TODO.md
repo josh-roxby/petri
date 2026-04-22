@@ -6,12 +6,12 @@ Running task list for Petri. Organised by build pass (see `petri-spec.md` §14).
 
 Core animations are in. Remaining Pass 1 work:
 
-- [ ] Drag-ingredient-onto-node mutation path (currently only Catalyse spawns children)
-- [ ] Tap-tap combine (two-parent mutation)
-- [ ] Chaos multi-child / no-child rolls on Catalyse
-- [ ] Discard collateral (chaos-scaled neighbour volatility spike) — placeholder exists
-- [ ] Action cooldowns (short/medium per spec §3 table)
-- [ ] Fire C1 for online collapses (currently only offline collapses run; passive re-sim could surface them)
+- [x] Tap-tap combine (two-parent mutation)
+- [x] Chaos multi-child / no-child rolls on Catalyse
+- [x] Discard collateral (chaos-scaled neighbour volatility spike)
+- [x] Action cooldowns (short/medium per spec §3 table)
+- [x] Fire C1 for in-session collapses
+- [ ] Drag-ingredient onto node (modal Catalyse + tap-tap combine cover most cases; true drag UX deferred)
 
 ## Next (Pass 1 — playable core loop)
 
@@ -160,6 +160,8 @@ _Reference `petri-spec.md` §16. These can be stubbed during Pass 1 and tuned la
 - [x] **2026-04-22** — Pass 1 offline sim: `lib/timeDelta.js` (shipment accrual, collapse rolls for volatile nodes). `ShipmentsScreen` with queue + collect + countdown. `WhileAwayModal` surfaces offline changes. `GeomIcon` shared component. Passive re-sim every 30s. Lab floating shipment card wired to live queues.
 - [x] **2026-04-22** — Pass 1 inventory + discoveries: `InventoryScreen` (Compounds / Materials tabs), `DiscoveriesScreen` (3-col grid + detail panel, dashed placeholder slots). Shared `BlobIcon` and `Pill` components. Journal seeded from starting dish + `recordDiscovery` dedup on catalyse with `hashNameSeed` for stable blob shapes across screens.
 - [x] **2026-04-22** — Pass 1 animations: 10 renderers (S1/S2/S3 stable, C1 collapse, H1 + SH1 harvest, T1–T4 micros) in `components/lab/animations.jsx`. `lib/useAnimations.js` drives a self-starting/stopping rAF loop (idle at zero cost when no anims are live). `AnimOverlay` sits above PetriDish in the Porthole clip with `pointerEvents:none`. Store actions return `{ok, events}` and the page fires them. Stabilise micro (T1) always; first touchdown to vol 0 also triggers the S1+S2+S3 reward triplet. Harvest fires H1 on success + SH1 additionally when stable one-shot consumed.
+- [x] **2026-04-22** — Pass 1 polish: per-node per-action cooldowns (stabilise 5s, catalyse 6s, contain/discard 20s, harvest 10s × (1+vol/50)); chaos rolls on Catalyse (0/1/2 children per chaos probability); discard collateral (chaos-scaled volatility spikes on parent + siblings, contained/scar/harvested immune); `computeTimeDelta` split so in-session collapses fire C1 live while long-gap collapses populate the WhileAway modal.
+- [x] **2026-04-22** — Pass 1 two-parent combine: `mutateFromTwoParents` (50/50 blend, higher noise), `buildCombinedChildNode` (dual `parents` array, dominant-parent affinity + name). `combineNodes` store action consumes 1× Ingredient, cooldowns both parents. Lab screen `⇌ COMBINE` button toggles combine mode; selection ring highlights the first parent; dish-stats strip turns into `— TAP SECOND PARENT —` hint. PetriDish renders edges for the full `parents` array so combined children show both lineage lines.
 
 ---
 

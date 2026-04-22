@@ -10,30 +10,37 @@ import { blobD, edgeControlPoint, nodeSeed } from '@/lib/blobD';
  *
  * Reference: proto-concepts/petri-ui-codebasis.md §9–10, petri-design.md §4.
  */
-export function PetriDish({ tick, nodes, onNodeTap }) {
+export function PetriDish({ tick, nodes, onNodeTap, highlightedNodeId = null }) {
   const pulse = 0.3 + Math.sin(tick * 0.09) * 0.12;
+
+  // Collect (child, parent) pairs for edge rendering. Nodes with `parents`
+  // array (combined children) draw one edge per listed parent.
+  const edgePairs = [];
+  for (const n of nodes) {
+    const parentIds = n.parents ?? (n.parent != null ? [n.parent] : []);
+    for (const pid of parentIds) {
+      const p = nodes.find((x) => x.id === pid);
+      if (p) edgePairs.push({ n, p });
+    }
+  }
 
   return (
     <svg viewBox="0 0 280 210" width="100%" height="100%" style={{ cursor: 'default' }}>
       {/* ── MYCELIUM EDGES (curved quad bezier, seeded) ── */}
-      {nodes
-        .filter((n) => n.parent != null)
-        .map((n) => {
-          const p = nodes.find((x) => x.id === n.parent);
-          if (!p) return null;
-          const scar = n.state === 'scar';
-          const { mx, my } = edgeControlPoint(p, n);
-          return (
-            <path
-              key={`e${n.id}`}
-              d={`M ${p.x},${p.y} Q ${mx},${my} ${n.x},${n.y}`}
-              fill="none"
-              stroke={scar ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.13)'}
-              strokeWidth={scar ? 0.5 : 1.1}
-              strokeLinecap="round"
-            />
-          );
-        })}
+      {edgePairs.map(({ n, p }) => {
+        const scar = n.state === 'scar';
+        const { mx, my } = edgeControlPoint(p, n);
+        return (
+          <path
+            key={`e${n.id}-${p.id}`}
+            d={`M ${p.x},${p.y} Q ${mx},${my} ${n.x},${n.y}`}
+            fill="none"
+            stroke={scar ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.13)'}
+            strokeWidth={scar ? 0.5 : 1.1}
+            strokeLinecap="round"
+          />
+        );
+      })}
 
       {/* ── NODES (8-layer stack, jitter for volatile) ── */}
       {nodes.map((n, ni) => {
@@ -144,6 +151,20 @@ export function PetriDish({ tick, nodes, onNodeTap }) {
               >
                 ×
               </text>
+            )}
+
+            {/* combine-mode selection ring — pulses white for the armed node */}
+            {highlightedNodeId === n.id && !scar && !harv && (
+              <circle
+                cx={n.x}
+                cy={n.y}
+                r={n.r + 7}
+                fill="none"
+                stroke="white"
+                strokeWidth="1.4"
+                opacity={0.4 + Math.sin(tick * 0.3) * 0.35}
+                strokeDasharray="2,2"
+              />
             )}
           </g>
         );
