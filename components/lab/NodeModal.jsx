@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import { AffBadge } from '@/components/shared/AffBadge';
+import { cooldownRemaining } from '@/lib/gameLogic';
 import { ACTION_COLORS, AFF_COLORS, CHAKRA, CHROME, MONO, Z, volatilityColor } from '@/lib/tokens';
 
 /**
@@ -43,31 +44,39 @@ export function NodeModal({ node, materials = {}, onClose, onAction }) {
       id: 'catalyse',
       label: 'Catalyse',
       dot: ACTION_COLORS.catalyse,
-      disabled: !isLive || isContained || (materials.ingredient ?? 0) <= 0,
+      baseDisabled: !isLive || isContained || (materials.ingredient ?? 0) <= 0,
     },
     {
       id: 'harvest',
       label: 'Harvest',
       dot: ACTION_COLORS.harvest,
-      disabled: TERMINAL_STATES.has(node.state),
+      baseDisabled: TERMINAL_STATES.has(node.state),
     },
     {
       id: 'contain',
       label: isContained ? 'Release' : 'Contain',
       dot: ACTION_COLORS.contain,
-      disabled:
+      baseDisabled:
         TERMINAL_STATES.has(node.state) || (!isContained && (materials.plasmaGel ?? 0) <= 0),
     },
     {
       id: 'discard',
       label: 'Discard',
       dot: ACTION_COLORS.discard,
-      disabled: node.state === 'scar' || (materials.bioFuel ?? 0) <= 0,
+      baseDisabled: node.state === 'scar' || (materials.bioFuel ?? 0) <= 0,
     },
-  ];
+  ].map((a) => {
+    const cdMs = cooldownRemaining(node, a.id);
+    return { ...a, cdMs, disabled: a.baseDisabled || cdMs > 0 };
+  });
 
+  const stabiliseCdMs = cooldownRemaining(node, 'stabilise');
   const stabiliseDisabled =
-    !isLive || isContained || node.volatility === 0 || (materials.stabiliser ?? 0) <= 0;
+    !isLive ||
+    isContained ||
+    node.volatility === 0 ||
+    (materials.stabiliser ?? 0) <= 0 ||
+    stabiliseCdMs > 0;
 
   return (
     <div
@@ -338,7 +347,7 @@ export function NodeModal({ node, materials = {}, onClose, onAction }) {
                     boxShadow: a.disabled ? 'none' : `0 0 5px ${a.dot}88`,
                   }}
                 />
-                {a.label}
+                {a.cdMs > 0 ? `${Math.ceil(a.cdMs / 1000)}s` : a.label}
               </button>
             ))}
           </div>
@@ -379,7 +388,7 @@ export function NodeModal({ node, materials = {}, onClose, onAction }) {
                 }}
               />
             )}
-            STABILISE
+            {stabiliseCdMs > 0 ? `${Math.ceil(stabiliseCdMs / 1000)}s` : 'STABILISE'}
           </button>
         </div>
       </div>

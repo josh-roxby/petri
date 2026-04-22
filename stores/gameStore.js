@@ -11,14 +11,23 @@
 import { create } from 'zustand';
 import {
   STABILISE_REDUCTION,
+  applyDiscardCollateral,
   buildChildNode,
   clamp,
+  cooldownRemaining,
   harvestOutcome,
   nextNodeId,
   pickChildPosition,
+  rollCatalyseChildren,
   stateFromVolatility,
+  withCooldown,
 } from '@/lib/gameLogic';
 import { computeTimeDelta as runTimeDelta, summaryIsNoteworthy } from '@/lib/timeDelta';
+
+// A passive / in-session time-delta with elapsed below this threshold animates
+// collapses directly. Anything longer is treated as "away" and surfaced via
+// the WhileAway modal instead.
+export const IN_SESSION_THRESHOLD_MS = 5 * 60 * 1000;
 
 const SAVE_KEY = 'petri_v1_save';
 
@@ -179,17 +188,19 @@ export const useGameStore = create((set, get) => ({
     if (node.state === 'scar' || node.state === 'harvested' || node.state === 'contained') {
       return { ok: false };
     }
+    if (cooldownRemaining(node, 'stabilise') > 0) return { ok: false };
 
     const newVol = clamp(node.volatility - STABILISE_REDUCTION, 0, 100);
     const crossedIntoStable = node.volatility > 0 && newVol <= 0;
 
     set((s) => ({
       materials: decrementMaterial(s.materials, 'stabiliser'),
-      ...patchNode(s, dishId, nodeId, (n) => ({
-        ...n,
-        volatility: newVol,
-        state: stateFromVolatility(newVol, n.state),
-      })),
+      ...patchNode(s, dishId, nodeId, (n) =>
+        withCooldown(
+          { ...n, volatility: newVol, state: stateFromVolatility(newVol, n.state) },
+          'stabilise'
+        )
+      ),
     }));
     get().save();
     // Stabilise always micro-rings. First touchdown to 0 adds the full
@@ -215,29 +226,58 @@ export const useGameStore = create((set, get) => ({
     if (node.state === 'scar' || node.state === 'harvested' || node.state === 'contained') {
       return { ok: false };
     }
+    if (cooldownRemaining(node, 'catalyse') > 0) return { ok: false };
+
+    // Chaos roll — the ingredient is consumed regardless, chaos may produce
+    // 0 / 1 / 2 children.
+    const childCount = rollCatalyseChildren(node);
 
     set((s) => {
       const liveDish = findDish(s, dishId);
-      const position = pickChildPosition(node, liveDish.nodes);
-      const child = buildChildNode({
-        parent: node,
-        id: nextNodeId(liveDish),
-        position,
-        nodes: liveDish.nodes,
-      });
+      // Build new children one at a time so each picks a non-overlapping
+      // position with the previous.
+      let workingNodes = liveDish.nodes;
+      let nextId = nextNodeId(liveDish);
+      const newChildren = [];
+      for (let i = 0; i < childCount; i++) {
+        const position = pickChildPosition(node, workingNodes);
+        const child = buildChildNode({
+          parent: node,
+          id: nextId++,
+          position,
+          nodes: workingNodes,
+        });
+        newChildren.push(child);
+        workingNodes = [...workingNodes, child];
+      }
+      let journal = s.journal;
+      for (const c of newChildren) {
+        journal = recordDiscovery(journal, {
+          name: c.name,
+          aff: c.aff,
+          tier: 1,
+          seed: hashNameSeed(c.name),
+        });
+      }
       return {
         materials: decrementMaterial(s.materials, 'ingredient'),
-        dishes: s.dishes.map((d) => (d.id === dishId ? { ...d, nodes: [...d.nodes, child] } : d)),
-        journal: recordDiscovery(s.journal, {
-          name: child.name,
-          aff: child.aff,
-          tier: 1,
-          seed: hashNameSeed(child.name),
-        }),
+        dishes: s.dishes.map((d) =>
+          d.id === dishId
+            ? {
+                ...d,
+                nodes: [
+                  ...d.nodes.map((n) => (n.id === nodeId ? withCooldown(n, 'catalyse') : n)),
+                  ...newChildren,
+                ],
+              }
+            : d
+        ),
+        journal,
       };
     });
     get().save();
-    return { ok: true, events: [{ type: 'T2', nodeId }] };
+    // T2 fires even on no-child — the spark signals the ingredient was consumed.
+    return { ok: true, events: [{ type: 'T2', nodeId }], childCount };
   },
 
   /**
@@ -254,13 +294,14 @@ export const useGameStore = create((set, get) => ({
     if (!alreadyContained && (node.state === 'scar' || node.state === 'harvested')) {
       return { ok: false };
     }
+    if (cooldownRemaining(node, 'contain') > 0) return { ok: false };
 
     set((s) => ({
       materials: alreadyContained ? s.materials : decrementMaterial(s.materials, 'plasmaGel'),
       ...patchNode(s, dishId, nodeId, (n) =>
         alreadyContained
-          ? { ...n, state: stateFromVolatility(n.volatility, 'alive') }
-          : { ...n, state: 'contained' }
+          ? withCooldown({ ...n, state: stateFromVolatility(n.volatility, 'alive') }, 'contain')
+          : withCooldown({ ...n, state: 'contained' }, 'contain')
       ),
     }));
     get().save();
@@ -282,21 +323,41 @@ export const useGameStore = create((set, get) => ({
     if (!node) return { ok: false };
     if (state.materials.bioFuel <= 0) return { ok: false };
     if (node.state === 'scar') return { ok: false };
+    if (cooldownRemaining(node, 'discard') > 0) return { ok: false };
 
-    set((s) => ({
-      materials: decrementMaterial(s.materials, 'bioFuel'),
-      ...patchNode(s, dishId, nodeId, (n) => ({
-        ...n,
-        state: 'scar',
-        potency: 0,
-        volatility: 0,
-        purity: 0,
-        toxicity: 0,
-        name: '[COLLAPSED]',
-      })),
-    }));
+    let damaged = [];
+
+    set((s) => {
+      const liveDish = findDish(s, dishId);
+      const { nodes: afterCollateral, damaged: dmg } = applyDiscardCollateral(
+        liveDish.nodes,
+        nodeId
+      );
+      damaged = dmg;
+      // Scar the target itself after collateral resolution.
+      const finalNodes = afterCollateral.map((n) =>
+        n.id === nodeId
+          ? withCooldown(
+              {
+                ...n,
+                state: 'scar',
+                potency: 0,
+                volatility: 0,
+                purity: 0,
+                toxicity: 0,
+                name: '[COLLAPSED]',
+              },
+              'discard'
+            )
+          : n
+      );
+      return {
+        materials: decrementMaterial(s.materials, 'bioFuel'),
+        dishes: s.dishes.map((d) => (d.id === dishId ? { ...d, nodes: finalNodes } : d)),
+      };
+    });
     get().save();
-    return { ok: true, events: [{ type: 'T4', nodeId }] };
+    return { ok: true, events: [{ type: 'T4', nodeId }], damaged };
   },
 
   /**
@@ -309,6 +370,7 @@ export const useGameStore = create((set, get) => ({
     const node = findNode(dish, nodeId);
     if (!node) return { ok: false };
     if (node.state === 'scar' || node.state === 'harvested') return { ok: false };
+    if (cooldownRemaining(node, 'harvest') > 0) return { ok: false };
 
     const outcome = harvestOutcome(node);
 
@@ -316,12 +378,22 @@ export const useGameStore = create((set, get) => ({
       compounds: outcome.compound ? mergeCompound(s.compounds, outcome.compound) : s.compounds,
       ...patchNode(s, dishId, nodeId, (n) =>
         outcome.consumed
-          ? { ...n, state: 'harvested', potency: 0, volatility: 0, purity: 0, toxicity: 0 }
-          : {
+          ? {
               ...n,
-              volatility: outcome.newVolatility,
-              state: stateFromVolatility(outcome.newVolatility, n.state),
+              state: 'harvested',
+              potency: 0,
+              volatility: 0,
+              purity: 0,
+              toxicity: 0,
             }
+          : withCooldown(
+              {
+                ...n,
+                volatility: outcome.newVolatility,
+                state: stateFromVolatility(outcome.newVolatility, n.state),
+              },
+              'harvest'
+            )
       ),
     }));
     get().save();
@@ -357,12 +429,24 @@ export const useGameStore = create((set, get) => ({
    * app mount. Also run passively during long sessions to keep shipment
    * queues accurate if the page stays open for hours.
    */
+  /**
+   * Returns the summary so the caller can decide how to surface it:
+   *   - Long gaps (> IN_SESSION_THRESHOLD_MS) populate lastSummary for the
+   *     WhileAway modal; the player sees the scars already in place.
+   *   - Short gaps (passive re-sim during a live session) leave lastSummary
+   *     clear and the caller fires C1 animations for each collapse so the
+   *     narrative beat plays live.
+   */
   computeTimeDelta: () => {
     const state = get();
     const { patch, summary } = runTimeDelta({ state });
-    set({ ...patch, lastSummary: summaryIsNoteworthy(summary) ? summary : null });
+    const inSession = summary.elapsedMs < IN_SESSION_THRESHOLD_MS;
+    set({
+      ...patch,
+      lastSummary: !inSession && summaryIsNoteworthy(summary) ? summary : null,
+    });
     get().save();
-    return summary;
+    return { ...summary, inSession };
   },
 
   clearLastSummary: () => set({ lastSummary: null }),

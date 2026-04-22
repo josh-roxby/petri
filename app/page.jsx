@@ -59,13 +59,20 @@ export default function Home() {
   const collectShipment = useGameStore((s) => s.collectShipment);
 
   // On mount: load saved state, then run offline sim once, then keep it
-  // ticking passively so long sessions still see shipments arrive.
+  // ticking passively. In-session collapses fire C1 live; long-gap collapses
+  // go to the WhileAway modal via store.lastSummary.
   useEffect(() => {
     load();
-    computeTimeDelta();
-    const id = setInterval(computeTimeDelta, PASSIVE_SIM_INTERVAL_MS);
+    const runAndAnimate = () => {
+      const summary = computeTimeDelta();
+      if (summary?.inSession && summary.collapses?.length) {
+        fire(summary.collapses.map((c) => ({ type: 'C1', nodeId: c.nodeId })));
+      }
+    };
+    runAndAnimate();
+    const id = setInterval(runAndAnimate, PASSIVE_SIM_INTERVAL_MS);
     return () => clearInterval(id);
-  }, [load, computeTimeDelta]);
+  }, [load, computeTimeDelta, fire]);
 
   const activeDish = dishes.find((d) => d.id === activeDishId) ?? dishes[0];
 
