@@ -2,23 +2,18 @@
 
 Running task list for Petri. Organised by build pass (see `petri-spec.md` §14). Move items to `Done` with a date when complete.
 
-## Now (Pass 0 — scaffolding)
+## Now (Pass 1 — next up)
 
-- [ ] Scaffold Next.js App Router project at repo root (`app/`, `public/`)
-- [ ] Add PWA config (`manifest.json`, service worker stub)
-- [ ] Configure Google Fonts (Space Mono, Chakra Petch) via root layout
-- [ ] Create `lib/tokens.js` with `AFF_COLORS`, `ACTION_COLORS`, `CHROME`, `MONO`, `CHAKRA`, layout constants
-- [ ] Create `lib/blobD.js` (seeded quadratic bezier blob path generator)
-- [ ] Set up Zustand store skeleton (`stores/gameStore.js`)
-- [ ] Add lint (ESLint), formatter (Prettier), and basic `package.json` scripts (`dev`, `build`, `lint`, `typecheck`)
-- [ ] Decide on TypeScript vs JS — prototype is JS; lean JS for v1, revisit at Pass 3
-- [ ] Add minimal CI (GitHub Actions: lint + build on PR)
+Pass 0 scaffolding is complete. Begin the playable-core-loop work below. Start with the shell + chrome components, then Porthole + PetriDish, then wire the first node modal interaction.
+
+- [ ] Build the app shell (`components/shell/AppHeader.jsx`, `NavPill.jsx`, `Grid.jsx`) and wire the shared 160ms tick
 
 ## Next (Pass 1 — playable core loop)
 
 Goal of pass: prove the loop feels good. Single petri, single dish slot, no economy, no skill trees.
 
 **Shell + chrome**
+
 - [ ] `components/shell/AppHeader.jsx` — logo + currency + store button + settings
 - [ ] `components/shell/NavPill.jsx` — floating 5-item bottom pill
 - [ ] `components/shell/Grid.jsx` — ambient background grid
@@ -27,6 +22,7 @@ Goal of pass: prove the loop feels good. Single petri, single dish slot, no econ
 - [ ] Ambient floating particles (7 dots, sin y-motion)
 
 **Lab screen**
+
 - [ ] `components/lab/Porthole.jsx` — ring + bolts + radial fill
 - [ ] `components/lab/PetriDish.jsx` — SVG node graph with blob rendering
 - [ ] Node rendering stack (8 layers: ambient glow → hot centre)
@@ -35,12 +31,14 @@ Goal of pass: prove the loop feels good. Single petri, single dish slot, no econ
 - [ ] Dish stats readout (DISH / NODES / STABLE%)
 
 **Node interaction**
+
 - [ ] `components/lab/NodeModal.jsx` — 60%-width centred modal, affinity bar + stat grid + action buttons
 - [ ] Stat colour rules (volatility 4-step scale; others white by opacity)
 - [ ] Outside-click close (mousedown listener on modal content ref)
 - [ ] Five actions wired to store mutations
 
 **Game logic**
+
 - [ ] `lib/gameLogic.js` — property math: inheritance, chaos noise, volatility decay
 - [ ] Collapse rolls (leaf/child only, chaos-driven blast radius)
 - [ ] Stabilise / Catalyse / Contain / Discard / Harvest resolution
@@ -49,22 +47,26 @@ Goal of pass: prove the loop feels good. Single petri, single dish slot, no econ
 - [ ] Tap-tap combine mutation path
 
 **Time delta + persistence**
+
 - [ ] `lib/timeDelta.js` — offline sim on app open (shipment accrual, collapse rolls, volatility ticks)
 - [ ] "While you were away" summary screen
 - [ ] localStorage save/load (throttled per action)
 
 **Shipments (Pass 1 subset: stabiliser + ingredients only)**
+
 - [ ] Shipment queue accrual logic
 - [ ] Floating shipment card on Lab screen
 - [ ] `components/screens/ShipmentsScreen.jsx` — queue + collect
 - [ ] SH1 shipment collect animation (gentle shake → empty → stub fade-in)
 
 **Journal + Library (basic)**
+
 - [ ] `components/screens/InventoryScreen.jsx` — Compounds + Materials tabs
 - [ ] `components/screens/DiscoveriesScreen.jsx` — 3-column grid, known + placeholders
 - [ ] `components/shared/BlobIcon.jsx`, `GeomIcon.jsx`, `AffBadge.jsx`
 
 **Animations (from anim spec — Tier 1 + T1–T4 micro)**
+
 - [ ] S1 stable pulse rings
 - [ ] S2 stable circle + diamond grid (clipPath)
 - [ ] S3 stable edge ripple (bezier-traced)
@@ -137,10 +139,15 @@ _Reference `petri-spec.md` §16. These can be stubbed during Pass 1 and tuned la
 - [x] **2026-04-22** — Initial repo scaffold: CLAUDE.md + TODO.md placeholders
 - [x] **2026-04-22** — Import proto-concepts docs from local dev folder
 - [x] **2026-04-22** — Rewrite CLAUDE.md and TODO.md from specs; lock build plan
+- [x] **2026-04-22** — Pass 0: Next.js 15 App Router scaffold (JS, not TS), PWA manifest, next/font (Space Mono + Chakra Petch), ESLint + Prettier, GitHub Actions CI
+- [x] **2026-04-22** — `lib/tokens.js` (AFF_COLORS, ACTION_COLORS, volatilityColor, CHROME, MONO, CHAKRA, layout constants, z-index ladder, TICK_MS)
+- [x] **2026-04-22** — `lib/blobD.js` (blobD, nodeSeed, edgeControlPoint, evalQuadBezier)
+- [x] **2026-04-22** — `stores/gameStore.js` Zustand skeleton with save/load/reset + action stubs
 
 ---
 
 **Conventions**
+
 - Check items off (`[x]`) when complete and move to `Done` with the date.
 - Keep `Now` to 1–3 active items at any moment.
 - Add notes/links inline under an item when helpful.

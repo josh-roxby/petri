@@ -20,17 +20,17 @@ Petri is a **mobile-first PWA** — a sandbox fictional-science / idle-adjacent 
 
 ## Tech stack
 
-| Layer | Choice |
-|---|---|
-| Framework | Next.js (App Router), PWA config |
-| Hosting | Vercel (v1), Render backend (v2, post-pilot) |
-| Styling | Inline styles + SVG — no Tailwind, no CSS-in-JS lib |
-| State | Zustand + React local state for UI-only |
-| Persistence | localStorage (v1), Render + Postgres (v2) |
-| Graph viz | SVG, blob paths via seeded quadratic bezier |
-| Animation | Single `setInterval` tick at 160ms, no CSS keyframes / GSAP |
-| Cron | Vercel Cron — daily store rotation seed only |
-| Fonts | Space Mono (data/mono), Chakra Petch (UI labels) |
+| Layer       | Choice                                                      |
+| ----------- | ----------------------------------------------------------- |
+| Framework   | Next.js (App Router), PWA config                            |
+| Hosting     | Vercel (v1), Render backend (v2, post-pilot)                |
+| Styling     | Inline styles + SVG — no Tailwind, no CSS-in-JS lib         |
+| State       | Zustand + React local state for UI-only                     |
+| Persistence | localStorage (v1), Render + Postgres (v2)                   |
+| Graph viz   | SVG, blob paths via seeded quadratic bezier                 |
+| Animation   | Single `setInterval` tick at 160ms, no CSS keyframes / GSAP |
+| Cron        | Vercel Cron — daily store rotation seed only                |
+| Fonts       | Space Mono (data/mono), Chakra Petch (UI labels)            |
 
 ## Design non-negotiables
 
@@ -52,6 +52,7 @@ These rules are invariant across every screen and component:
 **Compound property vector:** Potency, Volatility, Purity, Toxicity, Chaos (permanent at birth), Affinity (enum: Organic, Enzyme, Acid, Mineral, Synthetic + unlockables).
 
 **Five actions, per-node via centred modal:**
+
 - **Stabilise** — reduce volatility (1× Stabiliser, short cd)
 - **Catalyse** — force mutation tick, spawn child (1× Basic Ingredient, short cd)
 - **Contain** — freeze node (1× Plasm/Gel, medium cd, reversible)
@@ -59,6 +60,7 @@ These rules are invariant across every screen and component:
 - **Harvest** — extract material (free, cooldown-gated, volatility-scaled)
 
 **Mutation paths:**
+
 - Drag ingredient → node (70/30 parent/ingredient + noise)
 - Tap-tap combine (50/50 + higher noise)
 
@@ -124,11 +126,23 @@ public/
 
 ### Setup
 
-_TBD — project not yet scaffolded. Pass 1 kicks off with `npx create-next-app` (App Router) and pulling in design tokens._
+```bash
+npm install          # Node 20+
+npm run dev          # http://localhost:3000
+```
+
+Fonts are loaded via `next/font` in `app/layout.jsx` and exposed as CSS variables (`--font-space-mono`, `--font-chakra-petch`). Reference them via the `MONO` / `CHAKRA` constants in `lib/tokens.js`; never hard-code font-family strings.
 
 ### Common commands
 
-_TBD — will be populated as scripts are added (dev, build, lint, typecheck, test)._
+| Command                | Purpose                         |
+| ---------------------- | ------------------------------- |
+| `npm run dev`          | Next.js dev server on :3000     |
+| `npm run build`        | Production build                |
+| `npm run start`        | Serve the production build      |
+| `npm run lint`         | ESLint (`next/core-web-vitals`) |
+| `npm run format`       | Prettier write                  |
+| `npm run format:check` | Prettier check (runs in CI)     |
 
 ### Conventions
 
@@ -139,6 +153,7 @@ _TBD — will be populated as scripts are added (dev, build, lint, typecheck, te
 ## Open questions
 
 Tracked in `petri-spec.md` §16 — all critical items resolved for Pass 1. Still open:
+
 - Plasm/Gel final name
 - Landmark compound list
 - XP curve constants

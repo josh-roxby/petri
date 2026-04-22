@@ -1,0 +1,11 @@
+{
+  "name": "Petri",
+  "short_name": "Petri",
+  "description": "Grow mutating compounds. Balance volatility against potency. Harvest what survives.",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#060606",
+  "theme_color": "#060606",
+  "icons": []
+}

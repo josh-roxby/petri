@@ -1,0 +1,6 @@
+node_modules
+.next
+out
+build
+proto-concepts
+package-lock.json

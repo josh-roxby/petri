@@ -1,0 +1,29 @@
+/*
+ * Minimal global reset only. Per petri-ui-codebasis.md, all component styling
+ * is inline (no CSS modules, no Tailwind). Do not grow this file.
+ */
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  height: 100%;
+  background: #060606;
+  color: #ffffff;
+  font-family: var(--font-space-mono), monospace;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overscroll-behavior: none;
+}
+
+button {
+  font-family: inherit;
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+}
