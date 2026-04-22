@@ -4,14 +4,14 @@ Running task list for Petri. Organised by build pass (see `petri-spec.md` §14).
 
 ## Now (Pass 1 — next up)
 
-Offline sim + shipments are in. Remaining Pass 1 screens:
+All four non-Lab screens are live. Remaining Pass 1 work:
 
-- [ ] `components/screens/InventoryScreen.jsx` — Compounds + Materials tabs
-- [ ] `components/screens/DiscoveriesScreen.jsx` — 3-column grid, known + placeholders
-- [ ] `components/shared/BlobIcon.jsx` — compound blob preview (used by Inventory + Discoveries)
-- [ ] Wire discovered compounds into `journal` on first-ever synthesis
-
-After screens, the last Pass 1 chunk is animations (S1/S2/S3, V1, C1, H1, T1–T4) and the remaining game-logic gaps (drag-ingredient UX, tap-tap combine, chaos multi-child, discard collateral, action cooldowns).
+- [ ] **Animations** (anim spec Tier 1 + micro): S1/S2/S3 stable, C1 collapse, H1 harvest, SH1 shipment, T1–T4 action micros
+- [ ] Drag-ingredient-onto-node mutation path (currently only Catalyse spawns children)
+- [ ] Tap-tap combine (two-parent mutation)
+- [ ] Chaos multi-child / no-child rolls on Catalyse
+- [ ] Discard collateral (chaos-scaled neighbour volatility spike) — placeholder exists
+- [ ] Action cooldowns (short/medium per spec §3 table)
 
 ## Next (Pass 1 — playable core loop)
 
@@ -70,9 +70,10 @@ Goal of pass: prove the loop feels good. Single petri, single dish slot, no econ
 
 **Journal + Library (basic)**
 
-- [ ] `components/screens/InventoryScreen.jsx` — Compounds + Materials tabs
-- [ ] `components/screens/DiscoveriesScreen.jsx` — 3-column grid, known + placeholders
-- [ ] `components/shared/BlobIcon.jsx`, `GeomIcon.jsx`, `AffBadge.jsx`
+- [x] `components/screens/InventoryScreen.jsx` — Compounds + Materials tabs
+- [x] `components/screens/DiscoveriesScreen.jsx` — 3-column grid, known + placeholders
+- [x] `components/shared/BlobIcon.jsx`, `GeomIcon.jsx`, `AffBadge.jsx`, `Pill.jsx`
+- [x] Journal seeding + recordDiscovery on catalyse
 
 **Animations (from anim spec — Tier 1 + T1–T4 micro)**
 
@@ -156,6 +157,7 @@ _Reference `petri-spec.md` §16. These can be stubbed during Pass 1 and tuned la
 - [x] **2026-04-22** — Pass 1 Lab slice: Porthole, PetriDish (8-layer blob stack), NodeModal (60% centred with volatility colour, 5 actions), LabScreen (absolute-centred dish, overlays), AffBadge; seeded dish nodes
 - [x] **2026-04-22** — Pass 1 game logic: `lib/gameLogic.js` pure helpers (inheritance, harvest formula, state transitions, child spawn). Store actions now mutate real state with material consumption. Modal buttons disable on insufficient material. localStorage save throttled per action.
 - [x] **2026-04-22** — Pass 1 offline sim: `lib/timeDelta.js` (shipment accrual, collapse rolls for volatile nodes). `ShipmentsScreen` with queue + collect + countdown. `WhileAwayModal` surfaces offline changes. `GeomIcon` shared component. Passive re-sim every 30s. Lab floating shipment card wired to live queues.
+- [x] **2026-04-22** — Pass 1 inventory + discoveries: `InventoryScreen` (Compounds / Materials tabs), `DiscoveriesScreen` (3-col grid + detail panel, dashed placeholder slots). Shared `BlobIcon` and `Pill` components. Journal seeded from starting dish + `recordDiscovery` dedup on catalyse with `hashNameSeed` for stable blob shapes across screens.
 
 ---
 

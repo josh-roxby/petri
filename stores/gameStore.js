@@ -86,7 +86,9 @@ const initialState = {
   },
 
   // ── DISCOVERIES ─────────────────────────────────────────────────────
-  journal: [], // all unique compounds ever synthesised
+  // Seed with the starting dish so the Pokédex isn't empty on first launch.
+  // `{ name, aff, tier, seed, foundAt }` — one entry per unique compound name.
+  journal: seedJournalFromStartingDish(),
 
   // ── SKILL TREES ─────────────────────────────────────────────────────
   skills: {
@@ -103,6 +105,33 @@ const initialState = {
   lastOpenedAt: null, // timestamp of the last time computeTimeDelta ran
   lastSummary: null, // { elapsedMs, shipments, collapses } — cleared after display
 };
+
+// Pull unique live names from the seeded dish so Discoveries has something
+// to show on first launch. Scars and harvested stubs are excluded.
+function seedJournalFromStartingDish() {
+  const nodes = [
+    { name: 'Viridis-α', aff: 0 },
+    { name: 'Lysate-β', aff: 1 },
+    { name: 'Corros-γ', aff: 2 },
+    { name: 'Ferric-α', aff: 3 },
+    { name: 'Nullite-β', aff: 4 },
+  ];
+  return nodes.map((n) => ({
+    name: n.name,
+    aff: n.aff,
+    tier: 1,
+    seed: hashNameSeed(n.name),
+    foundAt: null,
+  }));
+}
+
+// Stable hash → small integer, used as the blob-shape seed for a compound
+// across Inventory / Discoveries so the same compound looks identical.
+export function hashNameSeed(name) {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) | 0;
+  return Math.abs(h) % 997; // small prime mod for a compact seed
+}
 
 // ── INTERNAL HELPERS ─────────────────────────────────────────────────
 // Apply a node-level update inside a dish. `updater(node)` returns the new
@@ -188,6 +217,12 @@ export const useGameStore = create((set, get) => ({
       return {
         materials: decrementMaterial(s.materials, 'ingredient'),
         dishes: s.dishes.map((d) => (d.id === dishId ? { ...d, nodes: [...d.nodes, child] } : d)),
+        journal: recordDiscovery(s.journal, {
+          name: child.name,
+          aff: child.aff,
+          tier: 1,
+          seed: hashNameSeed(child.name),
+        }),
       };
     });
     get().save();
@@ -342,4 +377,11 @@ function mergeCompound(compounds, add) {
   const next = [...compounds];
   next[idx] = merged;
   return next;
+}
+
+// Add a compound to the journal if its name is new. Dedup is by name — the
+// stat vector can vary run-to-run but the name is the "Pokédex entry".
+function recordDiscovery(journal, entry) {
+  if (journal.some((j) => j.name === entry.name)) return journal;
+  return [...journal, { ...entry, foundAt: Date.now() }];
 }

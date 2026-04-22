@@ -9,14 +9,14 @@ import { ScreenPlaceholder } from '@/components/shell/ScreenPlaceholder';
 import { LabScreen } from '@/components/lab/LabScreen';
 import { NodeModal } from '@/components/lab/NodeModal';
 import { WhileAwayModal } from '@/components/lab/WhileAwayModal';
+import { DiscoveriesScreen } from '@/components/screens/DiscoveriesScreen';
+import { InventoryScreen } from '@/components/screens/InventoryScreen';
 import { ShipmentsScreen } from '@/components/screens/ShipmentsScreen';
 import { useTick } from '@/lib/useTick';
 import { CHROME, SHELL_MAX_W } from '@/lib/tokens';
 import { useGameStore } from '@/stores/gameStore';
 
 const SCREEN_TITLES = {
-  inventory: 'Inventory',
-  discoveries: 'Discoveries',
   skills: 'Skills',
 };
 
@@ -39,6 +39,8 @@ export default function Home() {
   const dishes = useGameStore((s) => s.dishes);
   const activeDishId = useGameStore((s) => s.activeDishId);
   const materials = useGameStore((s) => s.materials);
+  const compounds = useGameStore((s) => s.compounds);
+  const journal = useGameStore((s) => s.journal);
   const shipmentQueues = useGameStore((s) => s.shipmentQueues);
   const credits = useGameStore((s) => s.player.credits);
   const level = useGameStore((s) => s.player.level);
@@ -191,8 +193,12 @@ export default function Home() {
               onCollect={collectShipment}
             />
           )}
-          {screen !== 'lab' && screen !== 'shipments' && (
-            <ScreenPlaceholder title={SCREEN_TITLES[screen]} note="Pass 1 · under construction" />
+          {screen === 'inventory' && (
+            <InventoryScreen compounds={compounds} materials={materials} credits={credits} />
+          )}
+          {screen === 'discoveries' && <DiscoveriesScreen journal={journal} />}
+          {screen === 'skills' && (
+            <ScreenPlaceholder title={SCREEN_TITLES[screen]} note="Pass 3 · skill trees" />
           )}
         </div>
 
