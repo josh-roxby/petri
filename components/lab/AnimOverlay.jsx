@@ -32,9 +32,10 @@ export function AnimOverlay({ animations, nodes }) {
         const duration = ANIM_DURATION_MS[anim.type];
         const p = Math.max(0, Math.min(1, (now - anim.startMs) / duration));
         const node = anim.nodeId != null ? nodes.find((n) => n.id === anim.nodeId) : null;
-        // All Pass 1 animations target a node; bail if it's gone.
-        if (!node) return null;
-        return <g key={anim.id}>{renderer({ node, p, nodes, animId: anim.id })}</g>;
+        // Node-anchored animations bail if the target has been removed; the
+        // dish-centred ones (T5) don't need a node.
+        if (anim.nodeId != null && !node) return null;
+        return <g key={anim.id}>{renderer({ anim, node, p, nodes, animId: anim.id })}</g>;
       })}
     </svg>
   );

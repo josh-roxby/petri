@@ -23,6 +23,13 @@ import {
   stateFromVolatility,
   withCooldown,
 } from '@/lib/gameLogic';
+import {
+  dailyStoreSeed,
+  dayKey,
+  rollBuyInventory,
+  rollSpecialOffer,
+  sellPrice,
+} from '@/lib/economy';
 import { computeTimeDelta as runTimeDelta, summaryIsNoteworthy } from '@/lib/timeDelta';
 
 // A passive / in-session time-delta with elapsed below this threshold animates
@@ -108,7 +115,9 @@ const initialState = {
   },
 
   // ── STORE ───────────────────────────────────────────────────────────
-  storeSeed: null, // today's rotation seed, set by cron
+  storeSeed: null, // today's rotation seed (mirrors day key)
+  storeDay: null, // the day the seed was generated for
+  storeSpecialPurchased: null, // id of today's special if already bought
 
   // ── TIME DELTA ──────────────────────────────────────────────────────
   lastSavedAt: null,
@@ -526,6 +535,102 @@ export const useGameStore = create((set, get) => ({
   },
 
   clearLastSummary: () => set({ lastSummary: null }),
+
+  // ── STORE ECONOMY ──────────────────────────────────────────────────
+  /**
+   * Re-roll the daily store rotation if the current seed is stale. Also
+   * clears storeSpecialPurchased when a new day starts so today's special
+   * becomes available again. Safe to call frequently.
+   */
+  refreshStoreRotation: (now = Date.now()) => {
+    const today = dayKey(now);
+    if (get().storeDay === today) return;
+    set({
+      storeSeed: dailyStoreSeed(now),
+      storeDay: today,
+      storeSpecialPurchased: null,
+    });
+    get().save();
+  },
+
+  /**
+   * Sell `qty` of a compound stack. Compound is identified by its full
+   * inventory key (name|grade|tier) rather than transient id so the call
+   * is safe across save/loads.
+   */
+  sellCompound: (compoundKey, qty = 1) => {
+    const state = get();
+    const compound = state.compounds.find((c) => `${c.name}|${c.grade}|${c.tier}` === compoundKey);
+    if (!compound) return { ok: false };
+    if (qty <= 0 || qty > compound.qty) return { ok: false };
+    if (state.storeSeed == null) return { ok: false };
+
+    const unit = sellPrice(compound, state.storeSeed);
+    const total = unit * qty;
+
+    set((s) => ({
+      player: { ...s.player, credits: s.player.credits + total },
+      compounds: s.compounds
+        .map((c) =>
+          `${c.name}|${c.grade}|${c.tier}` === compoundKey ? { ...c, qty: c.qty - qty } : c
+        )
+        .filter((c) => c.qty > 0),
+    }));
+    get().save();
+    // T5 is dish-centred, not node-anchored — carry the total amount
+    // so the renderer can format "+NNN ◈".
+    return { ok: true, events: [{ type: 'T5', amount: total }], amount: total };
+  },
+
+  /**
+   * Buy a store item. Consumes credits, adds `qty` of the item's material.
+   * Returns the added quantity so the UI can flash feedback.
+   */
+  buyItem: (itemId) => {
+    const state = get();
+    if (state.storeSeed == null) return { ok: false };
+    const buyList = rollBuyInventory(state.storeSeed);
+    const item = buyList.find((i) => i.id === itemId);
+    if (!item) return { ok: false };
+    if (state.player.credits < item.price) return { ok: false };
+
+    set((s) => ({
+      player: { ...s.player, credits: s.player.credits - item.price },
+      materials: {
+        ...s.materials,
+        [item.material]: (s.materials[item.material] ?? 0) + item.qty,
+      },
+    }));
+    get().save();
+    return { ok: true, added: item.qty, material: item.material, paid: item.price };
+  },
+
+  /**
+   * Buy today's special offer (if any, and not yet bought). Credits the
+   * material payload from the offer into materials.
+   */
+  buySpecial: () => {
+    const state = get();
+    if (state.storeSeed == null) return { ok: false };
+    if (state.storeSpecialPurchased) return { ok: false };
+    const offer = rollSpecialOffer(state.storeSeed);
+    if (!offer) return { ok: false };
+    if (state.player.credits < offer.price) return { ok: false };
+
+    set((s) => {
+      const nextMaterials = { ...s.materials };
+      for (const [key, add] of Object.entries(offer.give ?? {})) {
+        nextMaterials[key] = (nextMaterials[key] ?? 0) + add;
+      }
+      return {
+        player: { ...s.player, credits: s.player.credits - offer.price },
+        materials: nextMaterials,
+        storeSpecialPurchased: offer.id,
+      };
+    });
+    get().save();
+    return { ok: true, offer };
+  },
 
   // ── PERSISTENCE ─────────────────────────────────────────────────────
   save: () => {

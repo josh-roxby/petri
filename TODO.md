@@ -91,13 +91,13 @@ Goal of pass: prove the loop feels good. Single petri, single dish slot, no econ
 
 ## Later (Pass 2 — economy)
 
-- [ ] `components/store/StoreOverlay.jsx` — bottom sheet, Buy / Sell / Special tabs
-- [ ] Sell side — single abstract market, daily rotated price bands
-- [ ] Buy side — 2–3 rotating ingredient slots, Bio-Inc. fuel always available
-- [ ] Plasm/Gel unlock pathway + shipments
-- [ ] All 6 shipment types wired through
-- [ ] Vercel Cron for daily store rotation seed
-- [ ] T5 store sale flash animation
+- [x] `components/store/StoreOverlay.jsx` — bottom sheet, Buy / Sell / Special tabs
+- [x] Sell side — single abstract market, daily rotated price bands
+- [x] Buy side — 3 rotating material packs, Bio-Inc. fuel always available
+- [x] Vercel Cron for daily store rotation seed (endpoint stub + vercel.json)
+- [x] T5 store sale flash animation
+- [ ] Plasm/Gel shipment unlock pathway (currently locked in UI; needs trigger)
+- [ ] All 6 shipment types wired (antidote + catalyst shipments pending)
 
 ## Later (Pass 3 — progression)
 
@@ -162,6 +162,7 @@ _Reference `petri-spec.md` §16. These can be stubbed during Pass 1 and tuned la
 - [x] **2026-04-22** — Pass 1 animations: 10 renderers (S1/S2/S3 stable, C1 collapse, H1 + SH1 harvest, T1–T4 micros) in `components/lab/animations.jsx`. `lib/useAnimations.js` drives a self-starting/stopping rAF loop (idle at zero cost when no anims are live). `AnimOverlay` sits above PetriDish in the Porthole clip with `pointerEvents:none`. Store actions return `{ok, events}` and the page fires them. Stabilise micro (T1) always; first touchdown to vol 0 also triggers the S1+S2+S3 reward triplet. Harvest fires H1 on success + SH1 additionally when stable one-shot consumed.
 - [x] **2026-04-22** — Pass 1 polish: per-node per-action cooldowns (stabilise 5s, catalyse 6s, contain/discard 20s, harvest 10s × (1+vol/50)); chaos rolls on Catalyse (0/1/2 children per chaos probability); discard collateral (chaos-scaled volatility spikes on parent + siblings, contained/scar/harvested immune); `computeTimeDelta` split so in-session collapses fire C1 live while long-gap collapses populate the WhileAway modal.
 - [x] **2026-04-22** — Pass 1 two-parent combine: `mutateFromTwoParents` (50/50 blend, higher noise), `buildCombinedChildNode` (dual `parents` array, dominant-parent affinity + name). `combineNodes` store action consumes 1× Ingredient, cooldowns both parents. Lab screen `⇌ COMBINE` button toggles combine mode; selection ring highlights the first parent; dish-stats strip turns into `— TAP SECOND PARENT —` hint. PetriDish renders edges for the full `parents` array so combined children show both lineage lines.
+- [x] **2026-04-22** — Pass 2 economy: `lib/economy.js` (dayKey + dailyStoreSeed + mulberry32 + rollBuyInventory + rollSpecialOffer + sellPrice / sellPriceBand — all deterministic per UTC day). Store actions `refreshStoreRotation`, `sellCompound`, `buyItem`, `buySpecial` with credit math and `storeSpecialPurchased` dedup. `StoreOverlay` bottom-sheet with Buy / Sell / Special tabs (daily-band slider for sell price, countdown to next rotation, locked-already-bought state for specials). T5 renderer fires at dish centre on sell with the credit amount. Vercel Cron endpoint at `/api/cron/store-rotation` + `vercel.json` scheduling it at 00:05 UTC daily (canonical seed for v2 server-side validation).
 
 ---
 

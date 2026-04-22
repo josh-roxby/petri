@@ -12,6 +12,7 @@ import { WhileAwayModal } from '@/components/lab/WhileAwayModal';
 import { DiscoveriesScreen } from '@/components/screens/DiscoveriesScreen';
 import { InventoryScreen } from '@/components/screens/InventoryScreen';
 import { ShipmentsScreen } from '@/components/screens/ShipmentsScreen';
+import { StoreOverlay } from '@/components/store/StoreOverlay';
 import { useAnimations } from '@/lib/useAnimations';
 import { useTick } from '@/lib/useTick';
 import { CHROME, SHELL_MAX_W } from '@/lib/tokens';
@@ -37,6 +38,7 @@ export default function Home() {
   const [modalNodeId, setModalNodeId] = useState(null);
   const [combineMode, setCombineMode] = useState(false);
   const [combineSelectedId, setCombineSelectedId] = useState(null);
+  const [storeOpen, setStoreOpen] = useState(false);
   const tick = useTick();
   const { animations, fire } = useAnimations();
 
@@ -60,22 +62,30 @@ export default function Home() {
   const harvestNode = useGameStore((s) => s.harvestNode);
   const combineNodes = useGameStore((s) => s.combineNodes);
   const collectShipment = useGameStore((s) => s.collectShipment);
+  const refreshStoreRotation = useGameStore((s) => s.refreshStoreRotation);
+  const sellCompound = useGameStore((s) => s.sellCompound);
+  const buyItem = useGameStore((s) => s.buyItem);
+  const buySpecial = useGameStore((s) => s.buySpecial);
+  const storeSeed = useGameStore((s) => s.storeSeed);
+  const storeSpecialPurchased = useGameStore((s) => s.storeSpecialPurchased);
 
-  // On mount: load saved state, then run offline sim once, then keep it
-  // ticking passively. In-session collapses fire C1 live; long-gap collapses
-  // go to the WhileAway modal via store.lastSummary.
+  // On mount: load saved state, run offline sim, refresh the daily store
+  // rotation, then keep simming passively. In-session collapses fire C1
+  // live; long-gap collapses go to the WhileAway modal via lastSummary.
   useEffect(() => {
     load();
+    refreshStoreRotation();
     const runAndAnimate = () => {
       const summary = computeTimeDelta();
       if (summary?.inSession && summary.collapses?.length) {
         fire(summary.collapses.map((c) => ({ type: 'C1', nodeId: c.nodeId })));
       }
+      refreshStoreRotation();
     };
     runAndAnimate();
     const id = setInterval(runAndAnimate, PASSIVE_SIM_INTERVAL_MS);
     return () => clearInterval(id);
-  }, [load, computeTimeDelta, fire]);
+  }, [load, computeTimeDelta, refreshStoreRotation, fire]);
 
   const activeDish = dishes.find((d) => d.id === activeDishId) ?? dishes[0];
 
@@ -191,7 +201,7 @@ export default function Home() {
 
         <Particles tick={tick} />
 
-        <AppHeader tick={tick} credits={credits} />
+        <AppHeader tick={tick} credits={credits} onStore={() => setStoreOpen(true)} />
 
         <div
           style={{
@@ -248,6 +258,22 @@ export default function Home() {
         )}
 
         {lastSummary && <WhileAwayModal summary={lastSummary} onClose={clearLastSummary} />}
+
+        {storeOpen && (
+          <StoreOverlay
+            storeSeed={storeSeed}
+            storeSpecialPurchased={storeSpecialPurchased}
+            credits={credits}
+            compounds={compounds}
+            onBuy={(itemId) => buyItem(itemId)}
+            onSell={(key, qty) => {
+              const result = sellCompound(key, qty);
+              if (result?.ok && result.events?.length) fire(result.events);
+            }}
+            onBuySpecial={() => buySpecial()}
+            onClose={() => setStoreOpen(false)}
+          />
+        )}
       </div>
     </div>
   );

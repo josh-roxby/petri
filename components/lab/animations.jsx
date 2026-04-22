@@ -427,4 +427,28 @@ export function T4({ node, p, nodes }) {
   );
 }
 
-export const ANIM_RENDERERS = { S1, S2, S3, C1, H1, SH1, T1, T2, T3, T4 };
+// ── T5: Store sale · credit counter rises at dish centre ────────────────
+// Dish-centred (140, 105 in SVG space); does not target a node. Carries
+// the sold amount via anim.amount.
+export function T5({ anim, p }) {
+  const rise = easeOut(p) * 20;
+  const fadeIn = Math.min(1, p / 0.2);
+  const fadeOut = Math.max(0, 1 - (p - 0.6) / 0.4);
+  const op = fadeIn * fadeOut;
+  return (
+    <text
+      x={140}
+      y={112 - rise}
+      textAnchor="middle"
+      fill="#1fcc79"
+      fontSize="15"
+      fontFamily="var(--font-space-mono), monospace"
+      fontWeight="700"
+      opacity={op}
+    >
+      +{anim?.amount ?? 0} ◈
+    </text>
+  );
+}
+
+export const ANIM_RENDERERS = { S1, S2, S3, C1, H1, SH1, T1, T2, T3, T4, T5 };
