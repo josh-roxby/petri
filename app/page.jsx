@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { AppHeader } from '@/components/shell/AppHeader';
 import { Grid } from '@/components/shell/Grid';
+import { InstallPrompt } from '@/components/shell/InstallPrompt';
 import { NavPill } from '@/components/shell/NavPill';
 import { Particles } from '@/components/shell/Particles';
 import { LabScreen } from '@/components/lab/LabScreen';
@@ -254,6 +255,8 @@ export default function Home() {
         </div>
 
         <NavPill active={screen} onChange={goToScreen} />
+
+        <InstallPrompt />
 
         {modalNode && (
           <NodeModal
