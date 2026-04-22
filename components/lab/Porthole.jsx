@@ -9,11 +9,15 @@ import { DISH_SIZE, PORTHOLE_BOLT } from '@/lib/tokens';
  *
  * Reference: proto-concepts/petri-design.md §3.2, petri-anim-spec.md §Porthole.
  */
-export function Porthole({ children }) {
+/**
+ * `hasX1` — pass true while an X1 animation is live to flash a white glow
+ * on the outer porthole ring per the anim spec.
+ */
+export function Porthole({ children, hasX1 = false }) {
   const bolt = PORTHOLE_BOLT;
   return (
     <div style={{ position: 'relative', width: DISH_SIZE, height: DISH_SIZE }}>
-      {/* outer ring */}
+      {/* outer ring — X1 glow applied here per anim spec §X1 */}
       <div
         aria-hidden
         style={{
@@ -21,7 +25,10 @@ export function Porthole({ children }) {
           inset: -9,
           borderRadius: '50%',
           border: '3px solid rgba(255,255,255,0.07)',
-          boxShadow: '0 0 40px rgba(255,255,255,0.02), inset 0 0 30px rgba(0,0,0,0.6)',
+          boxShadow: hasX1
+            ? '0 0 40px rgba(255,255,255,0.02), inset 0 0 30px rgba(0,0,0,0.6), 0 0 24px rgba(255,255,255,0.22)'
+            : '0 0 40px rgba(255,255,255,0.02), inset 0 0 30px rgba(0,0,0,0.6)',
+          transition: 'box-shadow 0.3s',
         }}
       />
       {/* middle ring */}

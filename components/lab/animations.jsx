@@ -451,4 +451,104 @@ export function T5({ anim, p }) {
   );
 }
 
-export const ANIM_RENDERERS = { S1, S2, S3, C1, H1, SH1, T1, T2, T3, T4, T5 };
+// ── X1: XP Gain / Level Up · ripples + float text + LEVEL UP label ─────────
+// Dish-centred (140, 105 in SVG space). Carries `anim.amount` (XP gained) and
+// `anim.levelUp` (boolean). Porthole outer ring glows separately — see Porthole.jsx.
+export function X1({ anim, p }) {
+  // Two staggered ripple rings from dish centre.
+  const rings = [0, 0.35].map((off, i) => {
+    const tp = Math.max(0, Math.min(1, (p - off) / 0.9));
+    const r = 20 + easeOut(tp) * 110;
+    const op = Math.max(0, 1 - tp) * 0.5;
+    return <circle key={i} cx={140} cy={105} r={r} fill="none" stroke="white" strokeWidth={1} opacity={op} />;
+  });
+
+  // XP amount floats upward and fades after 60% progress.
+  const rise = easeOut(p) * 30;
+  const xpFadeIn = Math.min(1, p / 0.15);
+  const xpFadeOut = Math.max(0, 1 - Math.max(0, p - 0.5) / 0.2);
+  const xpOp = xpFadeIn * xpFadeOut;
+
+  // LEVEL UP label visible from p=0.55 → 0.75.
+  const lvlIn = Math.min(1, Math.max(0, (p - 0.55) / 0.1));
+  const lvlOut = Math.max(0, 1 - Math.max(0, p - 0.7) / 0.1);
+  const lvlOp = (anim?.levelUp ? 1 : 0) * lvlIn * lvlOut;
+
+  return (
+    <Fragment>
+      {rings}
+      <text
+        x={140}
+        y={108 - rise}
+        textAnchor="middle"
+        fill="rgba(255,255,255,0.75)"
+        fontSize={11}
+        fontFamily="var(--font-space-mono), monospace"
+        fontWeight="700"
+        opacity={xpOp}
+      >
+        +{anim?.amount ?? 0} XP
+      </text>
+      {anim?.levelUp && (
+        <text
+          x={140}
+          y={130}
+          textAnchor="middle"
+          fill="white"
+          fontSize={8}
+          fontFamily="var(--font-chakra-petch), sans-serif"
+          letterSpacing={3}
+          opacity={lvlOp}
+        >
+          LEVEL UP
+        </text>
+      )}
+    </Fragment>
+  );
+}
+
+// ── T6: Skill Unlock · node icon + expanding ring + UNLOCKED label ───────────
+// Dish-centred (140, 105 in SVG space). Does not target a specific node.
+export function T6({ p }) {
+  // Envelope: fade in 0→0.15, hold, fade out 0.7→1.
+  const fadeIn = Math.min(1, p / 0.15);
+  const fadeOut = Math.max(0, 1 - Math.max(0, p - 0.7) / 0.3);
+  const env = fadeIn * fadeOut;
+
+  // Expanding ring.
+  const ringR = 10 + easeOut(p) * 22;
+  const ringOp = Math.max(0, 1 - p) * 0.7 * env;
+
+  // Glow pulse via sin(p*PI).
+  const glow = Math.sin(p * Math.PI);
+
+  return (
+    <Fragment>
+      <circle cx={140} cy={105} r={ringR} fill="none" stroke="white" strokeWidth={1} opacity={ringOp} />
+      <circle
+        cx={140}
+        cy={105}
+        r={9}
+        fill="none"
+        stroke="white"
+        strokeWidth={1.5}
+        opacity={0.6 * env + glow * 0.3 * env}
+      />
+      <circle cx={140} cy={105} r={3.5} fill="white" opacity={0.85 * env * glow} />
+      <text
+        x={140}
+        y={129}
+        textAnchor="middle"
+        fill="white"
+        fontSize={7}
+        fontFamily="var(--font-space-mono), monospace"
+        letterSpacing={1.5}
+        opacity={env}
+      >
+        UNLOCKED
+      </text>
+    </Fragment>
+  );
+}
+
+export const ANIM_RENDERERS = { S1, S2, S3, C1, H1, SH1, T1, T2, T3, T4, T5, X1, T6 };

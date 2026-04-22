@@ -30,6 +30,7 @@ export function LabScreen({
   onCollectShipment,
   onToggleCombine,
 }) {
+  const hasX1 = animations.some((a) => a.type === 'X1');
   const stableCount = dish.nodes.filter((n) => n.state === 'stable').length;
   const stablePct = dish.nodes.length ? Math.round((stableCount / dish.nodes.length) * 100) : 0;
 
@@ -163,7 +164,7 @@ export function LabScreen({
           zIndex: 2,
         }}
       >
-        <Porthole>
+        <Porthole hasX1={hasX1}>
           <PetriDish
             tick={tick}
             nodes={dish.nodes}

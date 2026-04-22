@@ -5,22 +5,19 @@ import { AppHeader } from '@/components/shell/AppHeader';
 import { Grid } from '@/components/shell/Grid';
 import { NavPill } from '@/components/shell/NavPill';
 import { Particles } from '@/components/shell/Particles';
-import { ScreenPlaceholder } from '@/components/shell/ScreenPlaceholder';
 import { LabScreen } from '@/components/lab/LabScreen';
 import { NodeModal } from '@/components/lab/NodeModal';
 import { WhileAwayModal } from '@/components/lab/WhileAwayModal';
 import { DiscoveriesScreen } from '@/components/screens/DiscoveriesScreen';
 import { InventoryScreen } from '@/components/screens/InventoryScreen';
 import { ShipmentsScreen } from '@/components/screens/ShipmentsScreen';
+import { SkillsScreen } from '@/components/screens/SkillsScreen';
 import { StoreOverlay } from '@/components/store/StoreOverlay';
 import { useAnimations } from '@/lib/useAnimations';
 import { useTick } from '@/lib/useTick';
+import { playerLevelFromXp } from '@/lib/skills';
 import { CHROME, SHELL_MAX_W } from '@/lib/tokens';
 import { useGameStore } from '@/stores/gameStore';
-
-const SCREEN_TITLES = {
-  skills: 'Skills',
-};
 
 // Re-run offline sim every 30s while the app is open so shipment queues
 // stay accurate during long sessions.
@@ -49,8 +46,11 @@ export default function Home() {
   const journal = useGameStore((s) => s.journal);
   const shipmentQueues = useGameStore((s) => s.shipmentQueues);
   const credits = useGameStore((s) => s.player.credits);
-  const level = useGameStore((s) => s.player.level);
+  const playerXp = useGameStore((s) => s.player.xp);
+  const skills = useGameStore((s) => s.skills);
   const lastSummary = useGameStore((s) => s.lastSummary);
+
+  const { level, xpPercent } = playerLevelFromXp(playerXp);
 
   const load = useGameStore((s) => s.load);
   const computeTimeDelta = useGameStore((s) => s.computeTimeDelta);
@@ -66,6 +66,7 @@ export default function Home() {
   const sellCompound = useGameStore((s) => s.sellCompound);
   const buyItem = useGameStore((s) => s.buyItem);
   const buySpecial = useGameStore((s) => s.buySpecial);
+  const unlockSkill = useGameStore((s) => s.unlockSkill);
   const storeSeed = useGameStore((s) => s.storeSeed);
   const storeSpecialPurchased = useGameStore((s) => s.storeSpecialPurchased);
 
@@ -220,7 +221,7 @@ export default function Home() {
               dish={activeDish}
               animations={animations}
               level={level}
-              xpPercent={0}
+              xpPercent={xpPercent}
               shipmentReady={readyShipment}
               combineMode={combineMode}
               combineSelectedId={combineSelectedId}
@@ -242,7 +243,13 @@ export default function Home() {
           )}
           {screen === 'discoveries' && <DiscoveriesScreen journal={journal} />}
           {screen === 'skills' && (
-            <ScreenPlaceholder title={SCREEN_TITLES[screen]} note="Pass 3 · skill trees" />
+            <SkillsScreen
+              skills={skills}
+              onUnlock={(tree, nodeId) => {
+                const result = unlockSkill(tree, nodeId);
+                if (result?.ok && result.events?.length) fire(result.events);
+              }}
+            />
           )}
         </div>
 

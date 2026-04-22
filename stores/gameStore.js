@@ -22,6 +22,7 @@ import {
   rollCatalyseChildren,
   stateFromVolatility,
   withCooldown,
+  withCooldownScaled,
 } from '@/lib/gameLogic';
 import {
   dailyStoreSeed,
@@ -31,6 +32,13 @@ import {
   sellPrice,
 } from '@/lib/economy';
 import { computeTimeDelta as runTimeDelta, summaryIsNoteworthy } from '@/lib/timeDelta';
+import {
+  XP,
+  SKILL_TREES,
+  canUnlock,
+  getActiveEffects,
+  playerLevelFromXp,
+} from '@/lib/skills';
 
 // A passive / in-session time-delta with elapsed below this threshold animates
 // collapses directly. Anything longer is treated as "away" and surfaced via
@@ -113,6 +121,8 @@ const initialState = {
     funding: { xp: 0, unlocked: ['f0'] },
     tooling: { xp: 0, unlocked: ['t0'] },
   },
+  // Tracks free-contain perk (t4): every other contain is free.
+  containFreeCount: 0,
 
   // ── STORE ───────────────────────────────────────────────────────────
   storeSeed: null, // today's rotation seed (mirrors day key)
@@ -153,6 +163,24 @@ export function hashNameSeed(name) {
 }
 
 // ── INTERNAL HELPERS ─────────────────────────────────────────────────
+/**
+ * Apply XP gains to a state snapshot, returning updated player + skills
+ * objects and a `leveledUp` flag for animation gating.
+ */
+function gainXp(s, { playerXp = 0, harvestXp = 0, fundingXp = 0, toolingXp = 0 }) {
+  const newTotal = s.player.xp + playerXp;
+  const { level, dishSlots } = playerLevelFromXp(newTotal);
+  return {
+    player: { ...s.player, xp: newTotal, level, dishSlots },
+    skills: {
+      harvest: { ...s.skills.harvest, xp: s.skills.harvest.xp + harvestXp },
+      funding: { ...s.skills.funding, xp: s.skills.funding.xp + fundingXp },
+      tooling: { ...s.skills.tooling, xp: s.skills.tooling.xp + toolingXp },
+    },
+    leveledUp: level > s.player.level,
+  };
+}
+
 // Apply a node-level update inside a dish. `updater(node)` returns the new
 // node (or null to delete). Anything else is left untouched.
 function patchNode(state, dishId, nodeId, updater) {
@@ -200,25 +228,31 @@ export const useGameStore = create((set, get) => ({
     }
     if (cooldownRemaining(node, 'stabilise') > 0) return { ok: false };
 
+    const effects = getActiveEffects(state.skills);
     const newVol = clamp(node.volatility - STABILISE_REDUCTION, 0, 100);
     const crossedIntoStable = node.volatility > 0 && newVol <= 0;
 
-    set((s) => ({
-      materials: decrementMaterial(s.materials, 'stabiliser'),
-      ...patchNode(s, dishId, nodeId, (n) =>
-        withCooldown(
-          { ...n, volatility: newVol, state: stateFromVolatility(newVol, n.state) },
-          'stabilise'
-        )
-      ),
-    }));
+    set((s) => {
+      const base = {
+        materials: decrementMaterial(s.materials, 'stabiliser'),
+        ...patchNode(s, dishId, nodeId, (n) =>
+          withCooldownScaled(
+            { ...n, volatility: newVol, state: stateFromVolatility(newVol, n.state) },
+            'stabilise',
+            effects.cooldownMult
+          )
+        ),
+      };
+      if (!crossedIntoStable) return base;
+      const { player, skills } = gainXp(s, { playerXp: XP.STABILISE_NODE });
+      return { ...base, player, skills };
+    });
     get().save();
-    // Stabilise always micro-rings. First touchdown to 0 adds the full
-    // stable-reward triplet (S1+S2+S3) since the anim spec allows them to
-    // run concurrently on the same node.
+    // T1 micro-ring always. Stable touchdown adds S1+S2+S3 reward triplet.
     const events = [{ type: 'T1', nodeId }];
     if (crossedIntoStable) {
       events.push({ type: 'S1', nodeId }, { type: 'S2', nodeId }, { type: 'S3', nodeId });
+      events.push({ type: 'X1', amount: XP.STABILISE_NODE, levelUp: false });
     }
     return { ok: true, events };
   },
@@ -238,14 +272,14 @@ export const useGameStore = create((set, get) => ({
     }
     if (cooldownRemaining(node, 'catalyse') > 0) return { ok: false };
 
+    const effects = getActiveEffects(state.skills);
     // Chaos roll — the ingredient is consumed regardless, chaos may produce
-    // 0 / 1 / 2 children.
-    const childCount = rollCatalyseChildren(node);
+    // 0 / 1 / 2 children. Skill bonus raises extra-child probability.
+    const childCount = rollCatalyseChildren(node, effects.catalyseExtraChildBonus);
+    let newDiscoveries = 0;
 
     set((s) => {
       const liveDish = findDish(s, dishId);
-      // Build new children one at a time so each picks a non-overlapping
-      // position with the previous.
       let workingNodes = liveDish.nodes;
       let nextId = nextNodeId(liveDish);
       const newChildren = [];
@@ -262,21 +296,31 @@ export const useGameStore = create((set, get) => ({
       }
       let journal = s.journal;
       for (const c of newChildren) {
+        const prevLen = journal.length;
         journal = recordDiscovery(journal, {
           name: c.name,
           aff: c.aff,
           tier: 1,
           seed: hashNameSeed(c.name),
         });
+        if (journal.length > prevLen) newDiscoveries++;
       }
+      const { player, skills } = gainXp(s, {
+        toolingXp: XP.TOOLING_CATALYSE,
+        playerXp: newDiscoveries * XP.DISCOVERY,
+      });
       return {
+        player,
+        skills,
         materials: decrementMaterial(s.materials, 'ingredient'),
         dishes: s.dishes.map((d) =>
           d.id === dishId
             ? {
                 ...d,
                 nodes: [
-                  ...d.nodes.map((n) => (n.id === nodeId ? withCooldown(n, 'catalyse') : n)),
+                  ...d.nodes.map((n) =>
+                    n.id === nodeId ? withCooldownScaled(n, 'catalyse', effects.cooldownMult) : n
+                  ),
                   ...newChildren,
                 ],
               }
@@ -300,20 +344,32 @@ export const useGameStore = create((set, get) => ({
     const node = findNode(dish, nodeId);
     if (!node) return { ok: false };
     const alreadyContained = node.state === 'contained';
-    if (!alreadyContained && state.materials.plasmaGel <= 0) return { ok: false };
     if (!alreadyContained && (node.state === 'scar' || node.state === 'harvested')) {
       return { ok: false };
     }
     if (cooldownRemaining(node, 'contain') > 0) return { ok: false };
 
-    set((s) => ({
-      materials: alreadyContained ? s.materials : decrementMaterial(s.materials, 'plasmaGel'),
-      ...patchNode(s, dishId, nodeId, (n) =>
-        alreadyContained
-          ? withCooldown({ ...n, state: stateFromVolatility(n.volatility, 'alive') }, 'contain')
-          : withCooldown({ ...n, state: 'contained' }, 'contain')
-      ),
-    }));
+    const effects = getActiveEffects(state.skills);
+    // Contain-economy perk (t4): every other contain is free.
+    const freeThisTurn =
+      !alreadyContained && effects.containFreeEveryOther && state.containFreeCount % 2 === 1;
+    if (!alreadyContained && !freeThisTurn && state.materials.plasmaGel <= 0) return { ok: false };
+
+    set((s) => {
+      const consumePlasma = !alreadyContained && !freeThisTurn;
+      const { player, skills } = gainXp(s, { toolingXp: alreadyContained ? 0 : XP.TOOLING_CONTAIN });
+      return {
+        player,
+        skills,
+        containFreeCount: alreadyContained ? s.containFreeCount : s.containFreeCount + 1,
+        materials: consumePlasma ? decrementMaterial(s.materials, 'plasmaGel') : s.materials,
+        ...patchNode(s, dishId, nodeId, (n) =>
+          alreadyContained
+            ? withCooldownScaled({ ...n, state: stateFromVolatility(n.volatility, 'alive') }, 'contain', effects.cooldownMult)
+            : withCooldownScaled({ ...n, state: 'contained' }, 'contain', effects.cooldownMult)
+        ),
+      };
+    });
     get().save();
     // T3 frost fires on containment only — releasing shouldn't replay it.
     return {
@@ -331,9 +387,13 @@ export const useGameStore = create((set, get) => ({
     const dish = findDish(state, dishId);
     const node = findNode(dish, nodeId);
     if (!node) return { ok: false };
-    if (state.materials.bioFuel <= 0) return { ok: false };
     if (node.state === 'scar') return { ok: false };
     if (cooldownRemaining(node, 'discard') > 0) return { ok: false };
+
+    const effects = getActiveEffects(state.skills);
+    // Fuel-free perk (t7): roll to skip fuel cost.
+    const skipFuel = Math.random() < effects.discardFuelFreeChance;
+    if (!skipFuel && state.materials.bioFuel <= 0) return { ok: false };
 
     let damaged = [];
 
@@ -341,13 +401,13 @@ export const useGameStore = create((set, get) => ({
       const liveDish = findDish(s, dishId);
       const { nodes: afterCollateral, damaged: dmg } = applyDiscardCollateral(
         liveDish.nodes,
-        nodeId
+        nodeId,
+        effects.discardCollateralMult
       );
       damaged = dmg;
-      // Scar the target itself after collateral resolution.
       const finalNodes = afterCollateral.map((n) =>
         n.id === nodeId
-          ? withCooldown(
+          ? withCooldownScaled(
               {
                 ...n,
                 state: 'scar',
@@ -357,12 +417,16 @@ export const useGameStore = create((set, get) => ({
                 toxicity: 0,
                 name: '[COLLAPSED]',
               },
-              'discard'
+              'discard',
+              effects.cooldownMult
             )
           : n
       );
+      const { player, skills } = gainXp(s, { toolingXp: XP.TOOLING_DISCARD });
       return {
-        materials: decrementMaterial(s.materials, 'bioFuel'),
+        player,
+        skills,
+        materials: skipFuel ? s.materials : decrementMaterial(s.materials, 'bioFuel'),
         dishes: s.dishes.map((d) => (d.id === dishId ? { ...d, nodes: finalNodes } : d)),
       };
     });
@@ -382,35 +446,65 @@ export const useGameStore = create((set, get) => ({
     if (node.state === 'scar' || node.state === 'harvested') return { ok: false };
     if (cooldownRemaining(node, 'harvest') > 0) return { ok: false };
 
+    const effects = getActiveEffects(state.skills);
     const outcome = harvestOutcome(node);
 
-    set((s) => ({
-      compounds: outcome.compound ? mergeCompound(s.compounds, outcome.compound) : s.compounds,
-      ...patchNode(s, dishId, nodeId, (n) =>
-        outcome.consumed
-          ? {
-              ...n,
-              state: 'harvested',
-              potency: 0,
-              volatility: 0,
-              purity: 0,
-              toxicity: 0,
-            }
-          : withCooldown(
-              {
+    // Apply skill modifiers to outcome before persisting.
+    if (outcome.compound) {
+      outcome.compound.qty += effects.harvestYieldBonus;
+      if (effects.harvestQualityMult !== 1) {
+        const q = node.purity * effects.harvestQualityMult * (1 - node.toxicity / 200);
+        outcome.compound.grade = q >= 70 ? 'A' : q >= 45 ? 'B' : q >= 25 ? 'C' : 'D';
+      }
+    }
+    // No-vol-spike perk (h8): unstable harvest doesn't raise volatility.
+    if (effects.harvestNoVolSpike && !outcome.consumed) {
+      outcome.newVolatility = node.volatility;
+    }
+
+    const harvestXp = outcome.success
+      ? outcome.consumed
+        ? XP.HARVEST_STABLE
+        : XP.HARVEST_UNSTABLE
+      : 0;
+
+    set((s) => {
+      const compound =
+        outcome.compound && effects.harvestYieldBonus
+          ? { ...outcome.compound }
+          : outcome.compound;
+      const { player, skills } = gainXp(s, { harvestXp });
+      return {
+        player,
+        skills,
+        compounds: compound ? mergeCompound(s.compounds, compound) : s.compounds,
+        ...patchNode(s, dishId, nodeId, (n) =>
+          outcome.consumed
+            ? {
                 ...n,
-                volatility: outcome.newVolatility,
-                state: stateFromVolatility(outcome.newVolatility, n.state),
-              },
-              'harvest'
-            )
-      ),
-    }));
+                state: 'harvested',
+                potency: 0,
+                volatility: 0,
+                purity: 0,
+                toxicity: 0,
+              }
+            : withCooldownScaled(
+                {
+                  ...n,
+                  volatility: outcome.newVolatility,
+                  state: stateFromVolatility(outcome.newVolatility, n.state),
+                },
+                'harvest',
+                effects.harvestCooldownMult
+              )
+        ),
+      };
+    });
     get().save();
-    // H1 always on success. SH1 only on stable one-shot (node transitions to stub).
     const events = [];
     if (outcome.success) events.push({ type: 'H1', nodeId });
     if (outcome.consumed) events.push({ type: 'SH1', nodeId });
+    if (harvestXp > 0) events.push({ type: 'X1', amount: harvestXp, levelUp: false });
     return { ok: true, events, outcome };
   },
 
@@ -435,10 +529,10 @@ export const useGameStore = create((set, get) => ({
       return { ok: false };
     }
 
+    const effects = getActiveEffects(state.skills);
     let newChildId = null;
     set((s) => {
       const liveDish = findDish(s, dishId);
-      // Child seeks a free spot near the midpoint between the two parents.
       const midAnchor = {
         x: (a.x + b.x) / 2,
         y: (a.y + b.y) / 2,
@@ -453,7 +547,21 @@ export const useGameStore = create((set, get) => ({
         nodes: liveDish.nodes,
       });
       newChildId = child.id;
+      const prevLen = s.journal.length;
+      const journal = recordDiscovery(s.journal, {
+        name: child.name,
+        aff: child.aff,
+        tier: 1,
+        seed: hashNameSeed(child.name),
+      });
+      const newDiscovery = journal.length > prevLen;
+      const { player, skills } = gainXp(s, {
+        toolingXp: XP.TOOLING_CATALYSE,
+        playerXp: newDiscovery ? XP.DISCOVERY : 0,
+      });
       return {
+        player,
+        skills,
         materials: decrementMaterial(s.materials, 'ingredient'),
         dishes: s.dishes.map((d) =>
           d.id === dishId
@@ -461,19 +569,16 @@ export const useGameStore = create((set, get) => ({
                 ...d,
                 nodes: [
                   ...d.nodes.map((n) =>
-                    n.id === aId || n.id === bId ? withCooldown(n, 'catalyse') : n
+                    n.id === aId || n.id === bId
+                      ? withCooldownScaled(n, 'catalyse', effects.cooldownMult)
+                      : n
                   ),
                   child,
                 ],
               }
             : d
         ),
-        journal: recordDiscovery(s.journal, {
-          name: child.name,
-          aff: child.aff,
-          tier: 1,
-          seed: hashNameSeed(child.name),
-        }),
+        journal,
       };
     });
     get().save();
@@ -565,20 +670,26 @@ export const useGameStore = create((set, get) => ({
     if (qty <= 0 || qty > compound.qty) return { ok: false };
     if (state.storeSeed == null) return { ok: false };
 
-    const unit = sellPrice(compound, state.storeSeed);
+    const effects = getActiveEffects(state.skills);
+    const unit = Math.round(sellPrice(compound, state.storeSeed) * effects.sellPriceMult);
     const total = unit * qty;
 
-    set((s) => ({
-      player: { ...s.player, credits: s.player.credits + total },
-      compounds: s.compounds
-        .map((c) =>
-          `${c.name}|${c.grade}|${c.tier}` === compoundKey ? { ...c, qty: c.qty - qty } : c
-        )
-        .filter((c) => c.qty > 0),
-    }));
+    set((s) => {
+      const { player, skills } = gainXp(s, {
+        fundingXp: Math.round(total * XP.FUNDING_PERCENT),
+        playerXp: Math.round(total * XP.SALE_PERCENT),
+      });
+      return {
+        player: { ...player, credits: player.credits + total },
+        skills,
+        compounds: s.compounds
+          .map((c) =>
+            `${c.name}|${c.grade}|${c.tier}` === compoundKey ? { ...c, qty: c.qty - qty } : c
+          )
+          .filter((c) => c.qty > 0),
+      };
+    });
     get().save();
-    // T5 is dish-centred, not node-anchored — carry the total amount
-    // so the renderer can format "+NNN ◈".
     return { ok: true, events: [{ type: 'T5', amount: total }], amount: total };
   },
 
@@ -630,6 +741,46 @@ export const useGameStore = create((set, get) => ({
     });
     get().save();
     return { ok: true, offer };
+  },
+
+  /**
+   * Unlock a skill tree node. Deducts XP from that tree's pool and adds the
+   * node to `unlocked`. The f3 (Plasm/Gel Supply) node also activates the
+   * plasmaGel shipment queue.
+   */
+  unlockSkill: (tree, nodeId) => {
+    const state = get();
+    const treeState = state.skills[tree];
+    if (!treeState) return { ok: false };
+    const unlockedSet = new Set(treeState.unlocked);
+    if (!canUnlock(tree, nodeId, unlockedSet)) return { ok: false };
+    const nodes = SKILL_TREES[tree];
+    const node = nodes?.find((n) => n.id === nodeId);
+    if (!node) return { ok: false };
+    if (treeState.xp < node.cost) return { ok: false };
+
+    set((s) => {
+      const patch = {
+        skills: {
+          ...s.skills,
+          [tree]: {
+            ...s.skills[tree],
+            xp: s.skills[tree].xp - node.cost,
+            unlocked: [...s.skills[tree].unlocked, nodeId],
+          },
+        },
+      };
+      // f3 activates the plasmaGel free-shipment queue.
+      if (nodeId === 'f3' && !s.shipmentQueues.plasmaGel) {
+        patch.shipmentQueues = {
+          ...s.shipmentQueues,
+          plasmaGel: { count: 0, lastAt: null },
+        };
+      }
+      return patch;
+    });
+    get().save();
+    return { ok: true, events: [{ type: 'T6' }] };
   },
 
   // ── PERSISTENCE ─────────────────────────────────────────────────────
