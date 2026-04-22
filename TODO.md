@@ -2,15 +2,15 @@
 
 Running task list for Petri. Organised by build pass (see `petri-spec.md` §14). Move items to `Done` with a date when complete.
 
-## Now (Pass 1 — next up)
+## Now (Pass 4 — polish, up next)
 
-Core animations are in. Remaining Pass 1 work:
+Pass 1, 2, 3 all shipped. PWA foundation landed out-of-band (installable + offline). Remaining Pass 4 priorities:
 
-- [x] Tap-tap combine (two-parent mutation)
-- [x] Chaos multi-child / no-child rolls on Catalyse
-- [x] Discard collateral (chaos-scaled neighbour volatility spike)
-- [x] Action cooldowns (short/medium per spec §3 table)
-- [x] Fire C1 for in-session collapses
+- [ ] Landmark compound discoveries (guaranteed progression gates)
+- [ ] Discovery journal depth (lineage viewer, first-discovered-on, rarity)
+- [ ] F1 dish-stable green glow + F2 light cascade (prestige beat for full stabilisation)
+- [ ] Real PNG icons for Android launchers that prefer raster over SVG
+- [ ] iOS splash screens per device size (noticeable on launch in standalone mode)
 - [ ] Drag-ingredient onto node (modal Catalyse + tap-tap combine cover most cases; true drag UX deferred)
 
 ## Next (Pass 1 — playable core loop)
@@ -101,30 +101,40 @@ Goal of pass: prove the loop feels good. Single petri, single dish slot, no econ
 
 ## Later (Pass 3 — progression)
 
-- [ ] `components/screens/SkillsScreen.jsx` — three sub-tabs (Harvest / Funding / Tooling)
-- [ ] SVG skill tree renderer (tier labels, edges, node states)
-- [ ] Harvest tree nodes (tier unlocks, precision, refinery, yield, speed + perks)
-- [ ] Funding tree nodes (cadence, queue, plasm/gel unlock, price multipliers, rotation slots)
-- [ ] Tooling tree nodes (bio-inc precision/efficiency, catalyse boost, contain duration, cooldowns)
-- [ ] Player level system + dish slot unlocks (L5, L12, …)
-- [ ] XP pipe across all sources
-- [ ] Harvest tier gating on compound rarity
-- [ ] `PetriSwitcher` modal carousel for multi-dish
-- [ ] X1 XP gain / level-up animation
-- [ ] T6 skill unlock animation
+- [x] `components/screens/SkillsScreen.jsx` — three sub-tabs (Harvest / Funding / Tooling)
+- [x] SVG skill tree renderer (tier labels, edges, node states)
+- [x] Harvest tree nodes (tier unlocks, precision, refinery, yield, speed + perks)
+- [x] Funding tree nodes (cadence, queue, plasm/gel unlock, price multipliers, rotation slots)
+- [x] Tooling tree nodes (bio-inc precision/efficiency, catalyse boost, contain duration, cooldowns)
+- [x] Player level system + dish slot unlocks (L5, L12, …)
+- [x] XP pipe across all sources
+- [x] X1 XP gain / level-up animation
+- [x] T6 skill unlock animation
+- [ ] Harvest tier gating on compound rarity (effects wired in `lib/skills.js`, but journal/store enforcement pending)
+- [ ] `PetriSwitcher` modal carousel for multi-dish (slot unlocks work; UI deferred to Pass 4)
 
 ## Later (Pass 4 — polish)
 
 - [ ] Landmark compound discoveries (guaranteed progression gates)
 - [ ] Discovery journal depth (lineage viewer, first-discovered-on, rarity)
 - [ ] Visual polish pass (CSS/SVG detail, animation refinement)
-- [ ] PWA install prompt + offline shell
 - [ ] Performance pass on large graphs (memoize `blobD()`, evaluate canvas for glow halos if >30 nodes)
 - [ ] F1 dish-stable green glow
 - [ ] F2 dish-stable light cascade
 - [ ] D1 discovery affinity burst
 - [ ] D2 discovery NEW chip
 - [ ] Sound design (optional)
+
+## Later (PWA polish — landed foundation, residual items)
+
+- [x] Manifest with icons (SVG 192 / 512 / maskable)
+- [x] Dynamic PNG apple-touch-icon via Next ImageResponse
+- [x] Service worker + offline shell (precache + cache-first statics + network-first HTML)
+- [x] beforeinstallprompt chip + iOS Share-sheet hint modal
+- [x] Apple-web-app meta, OG/Twitter cards, `--safe-*` CSS custom properties
+- [ ] Raster PNG icons at 192/512 for Android launchers that dislike SVG
+- [ ] iOS splash screens per device size (launch image in standalone mode)
+- [ ] "Update available" banner when a new SW is waiting (currently auto-claims on next load)
 
 ## Later (Pass 5 — backend, post-pilot)
 
@@ -163,6 +173,8 @@ _Reference `petri-spec.md` §16. These can be stubbed during Pass 1 and tuned la
 - [x] **2026-04-22** — Pass 1 polish: per-node per-action cooldowns (stabilise 5s, catalyse 6s, contain/discard 20s, harvest 10s × (1+vol/50)); chaos rolls on Catalyse (0/1/2 children per chaos probability); discard collateral (chaos-scaled volatility spikes on parent + siblings, contained/scar/harvested immune); `computeTimeDelta` split so in-session collapses fire C1 live while long-gap collapses populate the WhileAway modal.
 - [x] **2026-04-22** — Pass 1 two-parent combine: `mutateFromTwoParents` (50/50 blend, higher noise), `buildCombinedChildNode` (dual `parents` array, dominant-parent affinity + name). `combineNodes` store action consumes 1× Ingredient, cooldowns both parents. Lab screen `⇌ COMBINE` button toggles combine mode; selection ring highlights the first parent; dish-stats strip turns into `— TAP SECOND PARENT —` hint. PetriDish renders edges for the full `parents` array so combined children show both lineage lines.
 - [x] **2026-04-22** — Pass 2 economy: `lib/economy.js` (dayKey + dailyStoreSeed + mulberry32 + rollBuyInventory + rollSpecialOffer + sellPrice / sellPriceBand — all deterministic per UTC day). Store actions `refreshStoreRotation`, `sellCompound`, `buyItem`, `buySpecial` with credit math and `storeSpecialPurchased` dedup. `StoreOverlay` bottom-sheet with Buy / Sell / Special tabs (daily-band slider for sell price, countdown to next rotation, locked-already-bought state for specials). T5 renderer fires at dish centre on sell with the credit amount. Vercel Cron endpoint at `/api/cron/store-rotation` + `vercel.json` scheduling it at 00:05 UTC daily (canonical seed for v2 server-side validation).
+- [x] **2026-04-22** — Pass 3 progression: `lib/skills.js` (three 9-node trees Harvest/Funding/Tooling, cumulative tier costs 100/350/800 XP, `getActiveEffects` derives flat modifier map from unlocked sets, `playerLevelFromXp` table with dish-slot gates at L5/L12). XP pipe wired in every store action — stabilise→player, harvest→harvest+player, sell→funding+player, catalyse/contain/discard→tooling. `unlockSkill` action consumes tree XP + fires T6; f3 unlock dynamically provisions a `plasmaGel` shipment queue. Cooldowns/sell-price/shipment-cadence/collateral now respect skill effects. X1 and T6 animation renderers added (X1 drives a Porthole glow via `hasX1` prop passed through LabScreen). `SkillsScreen.jsx` renders 300×320 SVG tree per tab with tier labels, edges derived from prereqs, and tap-to-unlock detail card.
+- [x] **2026-04-22** — PWA foundation (out-of-band of Pass 4): `public/icons/` 192/512/maskable SVG, `app/icon.svg` favicon, `app/apple-icon.jsx` renders 180×180 PNG via Next ImageResponse. `public/sw.js` precache shell + cache-first `/_next/static` + network-first HTML + always-bypass `/api/*` + versioned cache eviction on activate. `ServiceWorkerRegistrar` mounted in root layout, production-only. `InstallPrompt` floating chip: Chrome/Edge/Android uses `beforeinstallprompt`; iOS shows a Share-sheet hint modal; session-scoped dismissal. Metadata adds appleWebApp (black-translucent), formatDetection off, OG/Twitter cards. `--safe-*` CSS custom properties for surgical safe-area insets.
 
 ---
 
