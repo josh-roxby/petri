@@ -1,14 +1,33 @@
 /*
- * Zustand global game store — Pass 1 skeleton.
- * Mutations are stubs; real logic lands in Pass 1 alongside lib/gameLogic.js
- * and lib/timeDelta.js.
+ * Zustand global game store.
+ *
+ * Action mutations call pure helpers in lib/gameLogic.js and immer-like
+ * patterns via Zustand's set() with structural copies. The store is the only
+ * place that mutates game state — components never touch it directly.
  *
  * Reference: proto-concepts/petri-ui-codebasis.md §13.
  */
 
 import { create } from 'zustand';
+import {
+  STABILISE_REDUCTION,
+  buildChildNode,
+  clamp,
+  harvestOutcome,
+  nextNodeId,
+  pickChildPosition,
+  stateFromVolatility,
+} from '@/lib/gameLogic';
 
 const SAVE_KEY = 'petri_v1_save';
+
+// Which material each action consumes. Harvest is free.
+export const ACTION_MATERIAL = {
+  stabilise: 'stabiliser',
+  catalyse: 'ingredient',
+  contain: 'plasmaGel',
+  discard: 'bioFuel',
+};
 
 const initialState = {
   // ── PLAYER ──────────────────────────────────────────────────────────
@@ -21,7 +40,7 @@ const initialState = {
 
   // ── DISHES ──────────────────────────────────────────────────────────
   // Seed nodes mirror the validated prototype dish so the Lab screen has
-  // something to render before mutation logic lands in the next slice.
+  // something to render from first paint.
   dishes: [
     {
       id: 1,
@@ -49,10 +68,10 @@ const initialState = {
   // ── INVENTORY ───────────────────────────────────────────────────────
   compounds: [], // harvested compounds with full property vectors
   materials: {
-    stabiliser: 3,
-    ingredient: 2,
-    plasmaGel: 0,
-    bioFuel: 0,
+    stabiliser: 8,
+    ingredient: 4,
+    plasmaGel: 2,
+    bioFuel: 2,
     catalyst: 1,
     antidote: 0,
   },
@@ -81,30 +100,184 @@ const initialState = {
   lastSavedAt: null,
 };
 
+// ── INTERNAL HELPERS ─────────────────────────────────────────────────
+// Apply a node-level update inside a dish. `updater(node)` returns the new
+// node (or null to delete). Anything else is left untouched.
+function patchNode(state, dishId, nodeId, updater) {
+  return {
+    dishes: state.dishes.map((d) => {
+      if (d.id !== dishId) return d;
+      return {
+        ...d,
+        nodes: d.nodes.map((n) => (n.id === nodeId ? updater(n) : n)).filter(Boolean),
+      };
+    }),
+  };
+}
+
+function decrementMaterial(materials, key, by = 1) {
+  return { ...materials, [key]: Math.max(0, (materials[key] ?? 0) - by) };
+}
+
+function findDish(state, dishId) {
+  return state.dishes.find((d) => d.id === dishId);
+}
+
+function findNode(dish, nodeId) {
+  return dish?.nodes.find((n) => n.id === nodeId);
+}
+
+// ── STORE ────────────────────────────────────────────────────────────
 export const useGameStore = create((set, get) => ({
   ...initialState,
 
-  // ── ACTIONS (Pass 1 stubs — replace with real logic) ────────────────
-  stabiliseNode: (_dishId, _nodeId) => {
-    // TODO Pass 1: reduce volatility by skill-scaled amount
+  // ── ACTIONS ──────────────────────────────────────────────────────
+  /**
+   * Stabilise: consume 1× Stabiliser, reduce volatility. If volatility
+   * hits 0 the node is permanently stable.
+   */
+  stabiliseNode: (dishId, nodeId) => {
+    const state = get();
+    const dish = findDish(state, dishId);
+    const node = findNode(dish, nodeId);
+    if (!node) return false;
+    if (state.materials.stabiliser <= 0) return false;
+    if (node.volatility <= 0) return false;
+    if (node.state === 'scar' || node.state === 'harvested' || node.state === 'contained') {
+      return false;
+    }
+
+    set((s) => ({
+      materials: decrementMaterial(s.materials, 'stabiliser'),
+      ...patchNode(s, dishId, nodeId, (n) => {
+        const newVol = clamp(n.volatility - STABILISE_REDUCTION, 0, 100);
+        return { ...n, volatility: newVol, state: stateFromVolatility(newVol, n.state) };
+      }),
+    }));
+    get().save();
+    return true;
   },
-  catalyseNode: (_dishId, _nodeId, _ingredientId) => {
-    // TODO Pass 1: force mutation tick, spawn child per chaos roll
+
+  /**
+   * Catalyse: consume 1× Ingredient, force a mutation tick — spawn a child
+   * with inherited + noisy properties.
+   */
+  catalyseNode: (dishId, nodeId) => {
+    const state = get();
+    const dish = findDish(state, dishId);
+    const node = findNode(dish, nodeId);
+    if (!node) return false;
+    if (state.materials.ingredient <= 0) return false;
+    if (node.state === 'scar' || node.state === 'harvested' || node.state === 'contained') {
+      return false;
+    }
+
+    set((s) => {
+      const liveDish = findDish(s, dishId);
+      const position = pickChildPosition(node, liveDish.nodes);
+      const child = buildChildNode({
+        parent: node,
+        id: nextNodeId(liveDish),
+        position,
+        nodes: liveDish.nodes,
+      });
+      return {
+        materials: decrementMaterial(s.materials, 'ingredient'),
+        dishes: s.dishes.map((d) => (d.id === dishId ? { ...d, nodes: [...d.nodes, child] } : d)),
+      };
+    });
+    get().save();
+    return true;
   },
-  harvestNode: (_dishId, _nodeId) => {
-    // TODO Pass 1: resolve harvest formula, push compound to inventory
+
+  /**
+   * Contain: consume 1× Plasm/Gel, freeze the node. Reversible: calling
+   * again on a contained node releases it back to its prior state.
+   */
+  containNode: (dishId, nodeId) => {
+    const state = get();
+    const dish = findDish(state, dishId);
+    const node = findNode(dish, nodeId);
+    if (!node) return false;
+    const alreadyContained = node.state === 'contained';
+    if (!alreadyContained && state.materials.plasmaGel <= 0) return false;
+    if (!alreadyContained && (node.state === 'scar' || node.state === 'harvested')) return false;
+
+    set((s) => ({
+      materials: alreadyContained ? s.materials : decrementMaterial(s.materials, 'plasmaGel'),
+      ...patchNode(s, dishId, nodeId, (n) =>
+        alreadyContained
+          ? { ...n, state: stateFromVolatility(n.volatility, 'alive') }
+          : { ...n, state: 'contained' }
+      ),
+    }));
+    get().save();
+    return true;
   },
-  containNode: (_dishId, _nodeId) => {
-    // TODO Pass 1: freeze node, flag contained
+
+  /**
+   * Discard: consume 1× Bio-Inc. Fuel, scar the target. Pass 1 does not
+   * model neighbour collateral yet — tracked in TODO for a later slice.
+   */
+  discardNode: (dishId, nodeId) => {
+    const state = get();
+    const dish = findDish(state, dishId);
+    const node = findNode(dish, nodeId);
+    if (!node) return false;
+    if (state.materials.bioFuel <= 0) return false;
+    if (node.state === 'scar') return false;
+
+    set((s) => ({
+      materials: decrementMaterial(s.materials, 'bioFuel'),
+      ...patchNode(s, dishId, nodeId, (n) => ({
+        ...n,
+        state: 'scar',
+        potency: 0,
+        volatility: 0,
+        purity: 0,
+        toxicity: 0,
+        name: '[COLLAPSED]',
+      })),
+    }));
+    get().save();
+    return true;
   },
-  discardNode: (_dishId, _nodeId) => {
-    // TODO Pass 1: destroy with collateral calc
+
+  /**
+   * Harvest: free. Stable nodes become one-shot harvested stubs; unstable
+   * nodes can be harvested repeatedly but each harvest raises volatility.
+   */
+  harvestNode: (dishId, nodeId) => {
+    const state = get();
+    const dish = findDish(state, dishId);
+    const node = findNode(dish, nodeId);
+    if (!node) return false;
+    if (node.state === 'scar' || node.state === 'harvested') return false;
+
+    const outcome = harvestOutcome(node);
+
+    set((s) => ({
+      compounds: outcome.compound ? mergeCompound(s.compounds, outcome.compound) : s.compounds,
+      ...patchNode(s, dishId, nodeId, (n) =>
+        outcome.consumed
+          ? { ...n, state: 'harvested', potency: 0, volatility: 0, purity: 0, toxicity: 0 }
+          : {
+              ...n,
+              volatility: outcome.newVolatility,
+              state: stateFromVolatility(outcome.newVolatility, n.state),
+            }
+      ),
+    }));
+    get().save();
+    return outcome;
   },
+
   collectShipment: (_type) => {
-    // TODO Pass 1: drain queue, add to materials
+    // TODO Pass 1 next slice: drain queue, add to materials
   },
+
   computeTimeDelta: (_elapsedMs) => {
-    // TODO Pass 1: offline sim on app open
+    // TODO Pass 1 next slice: offline sim on app open
   },
 
   // ── PERSISTENCE ─────────────────────────────────────────────────────
@@ -127,3 +300,15 @@ export const useGameStore = create((set, get) => ({
 
   reset: () => set(initialState),
 }));
+
+// Merge a new harvest payload into the compounds inventory, stacking by
+// name + grade + tier so the list doesn't grow one entry per harvest.
+function mergeCompound(compounds, add) {
+  const key = (c) => `${c.name}|${c.grade}|${c.tier}`;
+  const idx = compounds.findIndex((c) => key(c) === key(add));
+  if (idx < 0) return [...compounds, add];
+  const merged = { ...compounds[idx], qty: compounds[idx].qty + add.qty };
+  const next = [...compounds];
+  next[idx] = merged;
+  return next;
+}

@@ -21,25 +21,59 @@ const SCREEN_TITLES = {
 
 export default function Home() {
   const [screen, setScreen] = useState('lab');
-  const [nodeModal, setNodeModal] = useState(null);
+  const [modalNodeId, setModalNodeId] = useState(null);
   const tick = useTick();
 
   const dishes = useGameStore((s) => s.dishes);
   const activeDishId = useGameStore((s) => s.activeDishId);
+  const materials = useGameStore((s) => s.materials);
   const credits = useGameStore((s) => s.player.credits);
   const level = useGameStore((s) => s.player.level);
+  const stabiliseNode = useGameStore((s) => s.stabiliseNode);
+  const catalyseNode = useGameStore((s) => s.catalyseNode);
+  const containNode = useGameStore((s) => s.containNode);
+  const discardNode = useGameStore((s) => s.discardNode);
+  const harvestNode = useGameStore((s) => s.harvestNode);
 
   const activeDish = dishes.find((d) => d.id === activeDishId) ?? dishes[0];
 
-  // If the player opens a screen other than Lab, clear any open node modal.
+  // Derive the live modal node from the store each render so that after an
+  // action mutates state, the modal reflects the new stats.
+  const modalNode =
+    modalNodeId != null ? (activeDish.nodes.find((n) => n.id === modalNodeId) ?? null) : null;
+
   const goToScreen = (next) => {
     setScreen(next);
-    setNodeModal(null);
+    setModalNodeId(null);
   };
 
-  // Toggle: tapping the same node twice closes the modal.
   const handleNodeTap = (node) => {
-    setNodeModal((current) => (current?.id === node.id ? null : node));
+    setModalNodeId((current) => (current === node.id ? null : node.id));
+  };
+
+  const handleAction = (actionId, node) => {
+    const dishId = activeDish.id;
+    switch (actionId) {
+      case 'stabilise':
+        stabiliseNode(dishId, node.id);
+        break;
+      case 'catalyse':
+        catalyseNode(dishId, node.id);
+        // Close the modal so the player sees the new child on the dish.
+        setModalNodeId(null);
+        break;
+      case 'contain':
+        containNode(dishId, node.id);
+        break;
+      case 'discard':
+        discardNode(dishId, node.id);
+        setModalNodeId(null);
+        break;
+      case 'harvest':
+        harvestNode(dishId, node.id);
+        setModalNodeId(null);
+        break;
+    }
   };
 
   return (
@@ -109,15 +143,12 @@ export default function Home() {
 
         <NavPill active={screen} onChange={goToScreen} />
 
-        {nodeModal && (
+        {modalNode && (
           <NodeModal
-            node={nodeModal}
-            onClose={() => setNodeModal(null)}
-            onAction={(actionId) => {
-              // Action stubs land with lib/gameLogic.js in the next slice.
-              // For now just close the modal so taps feel responsive.
-              if (actionId) setNodeModal(null);
-            }}
+            node={modalNode}
+            materials={materials}
+            onClose={() => setModalNodeId(null)}
+            onAction={handleAction}
           />
         )}
       </div>

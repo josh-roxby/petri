@@ -4,9 +4,10 @@ Running task list for Petri. Organised by build pass (see `petri-spec.md` §14).
 
 ## Now (Pass 1 — next up)
 
-Pass 0 scaffolding is complete. Begin the playable-core-loop work below. Start with the shell + chrome components, then Porthole + PetriDish, then wire the first node modal interaction.
+Shell, Lab vertical slice, and core game logic are wired. Next push: offline sim, shipments queue, and the remaining screens (Inventory / Discoveries).
 
-- [ ] Build the app shell (`components/shell/AppHeader.jsx`, `NavPill.jsx`, `Grid.jsx`) and wire the shared 160ms tick
+- [ ] `lib/timeDelta.js` — offline sim on app open (shipment accrual, collapse rolls, volatility ticks)
+- [ ] Shipment queue accrual + collect flow (stabiliser + ingredients only for Pass 1)
 
 ## Next (Pass 1 — playable core loop)
 
@@ -14,43 +15,46 @@ Goal of pass: prove the loop feels good. Single petri, single dish slot, no econ
 
 **Shell + chrome**
 
-- [ ] `components/shell/AppHeader.jsx` — logo + currency + store button + settings
-- [ ] `components/shell/NavPill.jsx` — floating 5-item bottom pill
-- [ ] `components/shell/Grid.jsx` — ambient background grid
-- [ ] Wire up shared tick (`setInterval` 160ms) at app root, pass down as prop
-- [ ] Wave header divider (SVG, sin-driven)
-- [ ] Ambient floating particles (7 dots, sin y-motion)
+- [x] `components/shell/AppHeader.jsx` — logo + currency + store button + settings
+- [x] `components/shell/NavPill.jsx` — floating 5-item bottom pill
+- [x] `components/shell/Grid.jsx` — ambient background grid
+- [x] Wire up shared tick (`setInterval` 160ms) at app root, pass down as prop
+- [x] Wave header divider (SVG, sin-driven)
+- [x] Ambient floating particles (7 dots, sin y-motion)
 
 **Lab screen**
 
-- [ ] `components/lab/Porthole.jsx` — ring + bolts + radial fill
-- [ ] `components/lab/PetriDish.jsx` — SVG node graph with blob rendering
-- [ ] Node rendering stack (8 layers: ambient glow → hot centre)
-- [ ] Mycelium edges (curved quad bezier, seeded)
-- [ ] `components/lab/LabScreen.jsx` — absolute-centred dish, overlays (dish switcher, level/XP bar, shipment card)
-- [ ] Dish stats readout (DISH / NODES / STABLE%)
+- [x] `components/lab/Porthole.jsx` — ring + bolts + radial fill
+- [x] `components/lab/PetriDish.jsx` — SVG node graph with blob rendering
+- [x] Node rendering stack (8 layers: ambient glow → hot centre)
+- [x] Mycelium edges (curved quad bezier, seeded)
+- [x] `components/lab/LabScreen.jsx` — absolute-centred dish, overlays (dish switcher, level/XP bar, shipment card)
+- [x] Dish stats readout (DISH / NODES / STABLE%)
 
 **Node interaction**
 
-- [ ] `components/lab/NodeModal.jsx` — 60%-width centred modal, affinity bar + stat grid + action buttons
-- [ ] Stat colour rules (volatility 4-step scale; others white by opacity)
-- [ ] Outside-click close (mousedown listener on modal content ref)
-- [ ] Five actions wired to store mutations
+- [x] `components/lab/NodeModal.jsx` — 60%-width centred modal, affinity bar + stat grid + action buttons
+- [x] Stat colour rules (volatility 4-step scale; others white by opacity)
+- [x] Outside-click close (mousedown listener on modal content ref)
+- [x] Five actions wired to store mutations
 
 **Game logic**
 
-- [ ] `lib/gameLogic.js` — property math: inheritance, chaos noise, volatility decay
-- [ ] Collapse rolls (leaf/child only, chaos-driven blast radius)
-- [ ] Stabilise / Catalyse / Contain / Discard / Harvest resolution
-- [ ] Node state machine (alive / stable / volatile / contained / harvested-stub / scar)
-- [ ] Drag-ingredient-to-node mutation path
-- [ ] Tap-tap combine mutation path
+- [x] `lib/gameLogic.js` — property math: inheritance, chaos noise, volatility decay
+- [x] Stabilise / Catalyse / Contain / Discard / Harvest resolution (basic)
+- [x] Node state machine (alive / stable / volatile / contained / harvested-stub / scar)
+- [ ] Collapse rolls (leaf/child only, chaos-driven blast radius) — deferred to timeDelta slice
+- [ ] Drag-ingredient-to-node mutation path — Catalyse covers the programmatic path; drag UX comes with Inventory
+- [ ] Tap-tap combine mutation path — Pass 1.2
+- [ ] Chaos-driven multi/no-child on Catalyse — currently always 1 child
+- [ ] Discard collateral (sibling/parent damage) — currently scars target only
+- [ ] Action cooldowns — currently none (spam-limited only by materials)
 
 **Time delta + persistence**
 
 - [ ] `lib/timeDelta.js` — offline sim on app open (shipment accrual, collapse rolls, volatility ticks)
 - [ ] "While you were away" summary screen
-- [ ] localStorage save/load (throttled per action)
+- [x] localStorage save/load (throttled per action)
 
 **Shipments (Pass 1 subset: stabiliser + ingredients only)**
 
@@ -143,6 +147,9 @@ _Reference `petri-spec.md` §16. These can be stubbed during Pass 1 and tuned la
 - [x] **2026-04-22** — `lib/tokens.js` (AFF_COLORS, ACTION_COLORS, volatilityColor, CHROME, MONO, CHAKRA, layout constants, z-index ladder, TICK_MS)
 - [x] **2026-04-22** — `lib/blobD.js` (blobD, nodeSeed, edgeControlPoint, evalQuadBezier)
 - [x] **2026-04-22** — `stores/gameStore.js` Zustand skeleton with save/load/reset + action stubs
+- [x] **2026-04-22** — Pass 1 shell: AppHeader, NavPill, Grid, Particles, useTick, ScreenPlaceholder
+- [x] **2026-04-22** — Pass 1 Lab slice: Porthole, PetriDish (8-layer blob stack), NodeModal (60% centred with volatility colour, 5 actions), LabScreen (absolute-centred dish, overlays), AffBadge; seeded dish nodes
+- [x] **2026-04-22** — Pass 1 game logic: `lib/gameLogic.js` pure helpers (inheritance, harvest formula, state transitions, child spawn). Store actions now mutate real state with material consumption. Modal buttons disable on insufficient material. localStorage save throttled per action.
 
 ---
 

@@ -18,11 +18,13 @@ import { ACTION_COLORS, AFF_COLORS, CHAKRA, CHROME, MONO, Z, volatilityColor } f
  * Reference: proto-concepts/petri-spec.md §18, petri-design.md §9.
  */
 const LIVE_STATES = new Set(['alive', 'stable', 'volatile', 'contained']);
+const TERMINAL_STATES = new Set(['scar', 'harvested']);
 
-export function NodeModal({ node, onClose, onAction }) {
+export function NodeModal({ node, materials = {}, onClose, onAction }) {
   const ref = useRef(null);
   const c = AFF_COLORS[node.aff];
   const isLive = LIVE_STATES.has(node.state);
+  const isContained = node.state === 'contained';
   const volColor = volatilityColor(node.volatility);
 
   // close on outside click (mousedown on backdrop, not inside modal content)
@@ -34,24 +36,38 @@ export function NodeModal({ node, onClose, onAction }) {
     return () => document.removeEventListener('mousedown', handler);
   }, [onClose]);
 
+  // Disable buttons when terminal, not-live-for-that-action, or out of material.
+  // Contain toggles — it's enabled for already-contained nodes so you can release.
   const actions = [
-    { id: 'catalyse', label: 'Catalyse', dot: ACTION_COLORS.catalyse, disabled: !isLive },
+    {
+      id: 'catalyse',
+      label: 'Catalyse',
+      dot: ACTION_COLORS.catalyse,
+      disabled: !isLive || isContained || (materials.ingredient ?? 0) <= 0,
+    },
     {
       id: 'harvest',
       label: 'Harvest',
       dot: ACTION_COLORS.harvest,
-      disabled: node.state === 'scar' || node.state === 'harvested',
+      disabled: TERMINAL_STATES.has(node.state),
     },
-    { id: 'contain', label: 'Contain', dot: ACTION_COLORS.contain, disabled: !isLive },
+    {
+      id: 'contain',
+      label: isContained ? 'Release' : 'Contain',
+      dot: ACTION_COLORS.contain,
+      disabled:
+        TERMINAL_STATES.has(node.state) || (!isContained && (materials.plasmaGel ?? 0) <= 0),
+    },
     {
       id: 'discard',
       label: 'Discard',
       dot: ACTION_COLORS.discard,
-      disabled: node.state === 'scar',
+      disabled: node.state === 'scar' || (materials.bioFuel ?? 0) <= 0,
     },
   ];
 
-  const stabiliseDisabled = !isLive || node.volatility === 0;
+  const stabiliseDisabled =
+    !isLive || isContained || node.volatility === 0 || (materials.stabiliser ?? 0) <= 0;
 
   return (
     <div
