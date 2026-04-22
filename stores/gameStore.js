@@ -20,7 +20,30 @@ const initialState = {
   },
 
   // ── DISHES ──────────────────────────────────────────────────────────
-  dishes: [{ id: 1, name: 'Dish Alpha', nodes: [] }],
+  // Seed nodes mirror the validated prototype dish so the Lab screen has
+  // something to render before mutation logic lands in the next slice.
+  dishes: [
+    {
+      id: 1,
+      name: 'Dish Alpha',
+      nodes: [
+        // prettier-ignore
+        { id: 1, x: 140, y: 178, r: 17, aff: 0, state: 'stable',    potency: 72, volatility: 0,  purity: 68, toxicity: 12, chaos: 25, parent: null, name: 'Viridis-α' },
+        // prettier-ignore
+        { id: 2, x: 88,  y: 126, r: 13, aff: 1, state: 'alive',     potency: 55, volatility: 22, purity: 58, toxicity: 8,  chaos: 32, parent: 1,    name: 'Lysate-β' },
+        // prettier-ignore
+        { id: 3, x: 196, y: 122, r: 15, aff: 2, state: 'volatile',  potency: 60, volatility: 81, purity: 44, toxicity: 38, chaos: 62, parent: 1,    name: 'Corros-γ' },
+        // prettier-ignore
+        { id: 4, x: 50,  y: 68,  r: 11, aff: 3, state: 'stable',    potency: 48, volatility: 0,  purity: 71, toxicity: 6,  chaos: 18, parent: 2,    name: 'Ferric-α' },
+        // prettier-ignore
+        { id: 5, x: 126, y: 54,  r: 14, aff: 4, state: 'alive',     potency: 65, volatility: 34, purity: 52, toxicity: 22, chaos: 44, parent: 2,    name: 'Nullite-β' },
+        // prettier-ignore
+        { id: 6, x: 232, y: 58,  r: 9,  aff: 0, state: 'scar',      potency: 0,  volatility: 0,  purity: 0,  toxicity: 0,  chaos: 0,  parent: 3,    name: '[COLLAPSED]' },
+        // prettier-ignore
+        { id: 7, x: 36,  y: 18,  r: 8,  aff: 3, state: 'harvested', potency: 0,  volatility: 0,  purity: 0,  toxicity: 0,  chaos: 0,  parent: 4,    name: 'Ferric-α' },
+      ],
+    },
+  ],
   activeDishId: 1,
 
   // ── INVENTORY ───────────────────────────────────────────────────────
