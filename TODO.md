@@ -4,10 +4,14 @@ Running task list for Petri. Organised by build pass (see `petri-spec.md` §14).
 
 ## Now (Pass 1 — next up)
 
-Shell, Lab vertical slice, and core game logic are wired. Next push: offline sim, shipments queue, and the remaining screens (Inventory / Discoveries).
+Offline sim + shipments are in. Remaining Pass 1 screens:
 
-- [ ] `lib/timeDelta.js` — offline sim on app open (shipment accrual, collapse rolls, volatility ticks)
-- [ ] Shipment queue accrual + collect flow (stabiliser + ingredients only for Pass 1)
+- [ ] `components/screens/InventoryScreen.jsx` — Compounds + Materials tabs
+- [ ] `components/screens/DiscoveriesScreen.jsx` — 3-column grid, known + placeholders
+- [ ] `components/shared/BlobIcon.jsx` — compound blob preview (used by Inventory + Discoveries)
+- [ ] Wire discovered compounds into `journal` on first-ever synthesis
+
+After screens, the last Pass 1 chunk is animations (S1/S2/S3, V1, C1, H1, T1–T4) and the remaining game-logic gaps (drag-ingredient UX, tap-tap combine, chaos multi-child, discard collateral, action cooldowns).
 
 ## Next (Pass 1 — playable core loop)
 
@@ -52,15 +56,16 @@ Goal of pass: prove the loop feels good. Single petri, single dish slot, no econ
 
 **Time delta + persistence**
 
-- [ ] `lib/timeDelta.js` — offline sim on app open (shipment accrual, collapse rolls, volatility ticks)
-- [ ] "While you were away" summary screen
+- [x] `lib/timeDelta.js` — offline sim on app open (shipment accrual, collapse rolls)
+- [x] "While you were away" summary modal
+- [x] Passive re-sim every 30s so long sessions accrue shipments
 - [x] localStorage save/load (throttled per action)
 
 **Shipments (Pass 1 subset: stabiliser + ingredients only)**
 
-- [ ] Shipment queue accrual logic
-- [ ] Floating shipment card on Lab screen
-- [ ] `components/screens/ShipmentsScreen.jsx` — queue + collect
+- [x] Shipment queue accrual logic
+- [x] Floating shipment card on Lab screen
+- [x] `components/screens/ShipmentsScreen.jsx` — queue + collect
 - [ ] SH1 shipment collect animation (gentle shake → empty → stub fade-in)
 
 **Journal + Library (basic)**
@@ -150,6 +155,7 @@ _Reference `petri-spec.md` §16. These can be stubbed during Pass 1 and tuned la
 - [x] **2026-04-22** — Pass 1 shell: AppHeader, NavPill, Grid, Particles, useTick, ScreenPlaceholder
 - [x] **2026-04-22** — Pass 1 Lab slice: Porthole, PetriDish (8-layer blob stack), NodeModal (60% centred with volatility colour, 5 actions), LabScreen (absolute-centred dish, overlays), AffBadge; seeded dish nodes
 - [x] **2026-04-22** — Pass 1 game logic: `lib/gameLogic.js` pure helpers (inheritance, harvest formula, state transitions, child spawn). Store actions now mutate real state with material consumption. Modal buttons disable on insufficient material. localStorage save throttled per action.
+- [x] **2026-04-22** — Pass 1 offline sim: `lib/timeDelta.js` (shipment accrual, collapse rolls for volatile nodes). `ShipmentsScreen` with queue + collect + countdown. `WhileAwayModal` surfaces offline changes. `GeomIcon` shared component. Passive re-sim every 30s. Lab floating shipment card wired to live queues.
 
 ---
 

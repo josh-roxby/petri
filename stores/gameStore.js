@@ -18,6 +18,7 @@ import {
   pickChildPosition,
   stateFromVolatility,
 } from '@/lib/gameLogic';
+import { computeTimeDelta as runTimeDelta, summaryIsNoteworthy } from '@/lib/timeDelta';
 
 const SAVE_KEY = 'petri_v1_save';
 
@@ -77,10 +78,11 @@ const initialState = {
   },
 
   // ── SHIPMENTS ───────────────────────────────────────────────────────
+  // Only stabiliser + ingredient active in Pass 1. Plasm/Gel shipments
+  // unlock via the Funding skill tree in Pass 3.
   shipmentQueues: {
     stabiliser: { count: 0, lastAt: null },
     ingredient: { count: 0, lastAt: null },
-    plasmaGel: { count: 0, lastAt: null },
   },
 
   // ── DISCOVERIES ─────────────────────────────────────────────────────
@@ -98,6 +100,8 @@ const initialState = {
 
   // ── TIME DELTA ──────────────────────────────────────────────────────
   lastSavedAt: null,
+  lastOpenedAt: null, // timestamp of the last time computeTimeDelta ran
+  lastSummary: null, // { elapsedMs, shipments, collapses } — cleared after display
 };
 
 // ── INTERNAL HELPERS ─────────────────────────────────────────────────
@@ -272,13 +276,40 @@ export const useGameStore = create((set, get) => ({
     return outcome;
   },
 
-  collectShipment: (_type) => {
-    // TODO Pass 1 next slice: drain queue, add to materials
+  /**
+   * Drain a shipment queue into the matching material stock.
+   * Material key matches queue key (stabiliser / ingredient / plasmaGel).
+   */
+  collectShipment: (type) => {
+    const state = get();
+    const queue = state.shipmentQueues[type];
+    if (!queue || queue.count <= 0) return 0;
+    const qty = queue.count;
+    set((s) => ({
+      shipmentQueues: {
+        ...s.shipmentQueues,
+        [type]: { ...s.shipmentQueues[type], count: 0 },
+      },
+      materials: { ...s.materials, [type]: (s.materials[type] ?? 0) + qty },
+    }));
+    get().save();
+    return qty;
   },
 
-  computeTimeDelta: (_elapsedMs) => {
-    // TODO Pass 1 next slice: offline sim on app open
+  /**
+   * Run the offline sim for elapsed time since lastOpenedAt. Call once on
+   * app mount. Also run passively during long sessions to keep shipment
+   * queues accurate if the page stays open for hours.
+   */
+  computeTimeDelta: () => {
+    const state = get();
+    const { patch, summary } = runTimeDelta({ state });
+    set({ ...patch, lastSummary: summaryIsNoteworthy(summary) ? summary : null });
+    get().save();
+    return summary;
   },
+
+  clearLastSummary: () => set({ lastSummary: null }),
 
   // ── PERSISTENCE ─────────────────────────────────────────────────────
   save: () => {
