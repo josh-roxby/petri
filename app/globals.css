@@ -20,6 +20,17 @@ body {
   overscroll-behavior: none;
 }
 
+/* Respect iOS notch/home indicator when installed in standalone mode.
+   viewport-fit=cover paints edge-to-edge; these CSS custom properties
+   expose safe-area insets so individual chrome elements (header top,
+   nav bottom) can pad surgically without disturbing the 100vh shell. */
+:root {
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+}
+
 button {
   font-family: inherit;
   background: none;

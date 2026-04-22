@@ -16,11 +16,40 @@ const chakraPetch = Chakra_Petch({
   display: 'swap',
 });
 
+const DESCRIPTION =
+  'Grow mutating compounds. Balance volatility against potency. Harvest what survives.';
+
 export const metadata = {
-  title: 'Petri',
-  description:
-    'Grow mutating compounds. Balance volatility against potency. Harvest what survives.',
+  title: {
+    default: 'Petri',
+    template: '%s · Petri',
+  },
+  description: DESCRIPTION,
   manifest: '/manifest.json',
+  applicationName: 'Petri',
+  appleWebApp: {
+    capable: true,
+    title: 'Petri',
+    // black-translucent lets the porthole bleed under the notch/status bar,
+    // matching the full-bleed dish aesthetic.
+    statusBarStyle: 'black-translucent',
+  },
+  formatDetection: {
+    telephone: false,
+    email: false,
+    address: false,
+  },
+  openGraph: {
+    type: 'website',
+    title: 'Petri',
+    description: DESCRIPTION,
+    siteName: 'Petri',
+  },
+  twitter: {
+    card: 'summary',
+    title: 'Petri',
+    description: DESCRIPTION,
+  },
 };
 
 export const viewport = {
