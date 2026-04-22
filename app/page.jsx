@@ -12,6 +12,7 @@ import { WhileAwayModal } from '@/components/lab/WhileAwayModal';
 import { DiscoveriesScreen } from '@/components/screens/DiscoveriesScreen';
 import { InventoryScreen } from '@/components/screens/InventoryScreen';
 import { ShipmentsScreen } from '@/components/screens/ShipmentsScreen';
+import { useAnimations } from '@/lib/useAnimations';
 import { useTick } from '@/lib/useTick';
 import { CHROME, SHELL_MAX_W } from '@/lib/tokens';
 import { useGameStore } from '@/stores/gameStore';
@@ -35,6 +36,7 @@ export default function Home() {
   const [screen, setScreen] = useState('lab');
   const [modalNodeId, setModalNodeId] = useState(null);
   const tick = useTick();
+  const { animations, fire } = useAnimations();
 
   const dishes = useGameStore((s) => s.dishes);
   const activeDishId = useGameStore((s) => s.activeDishId);
@@ -95,25 +97,20 @@ export default function Home() {
 
   const handleAction = (actionId, node) => {
     const dishId = activeDish.id;
-    switch (actionId) {
-      case 'stabilise':
-        stabiliseNode(dishId, node.id);
-        break;
-      case 'catalyse':
-        catalyseNode(dishId, node.id);
-        setModalNodeId(null);
-        break;
-      case 'contain':
-        containNode(dishId, node.id);
-        break;
-      case 'discard':
-        discardNode(dishId, node.id);
-        setModalNodeId(null);
-        break;
-      case 'harvest':
-        harvestNode(dishId, node.id);
-        setModalNodeId(null);
-        break;
+    const runner = {
+      stabilise: stabiliseNode,
+      catalyse: catalyseNode,
+      contain: containNode,
+      discard: discardNode,
+      harvest: harvestNode,
+    }[actionId];
+    if (!runner) return;
+    const result = runner(dishId, node.id);
+    if (result?.ok && result.events?.length) fire(result.events);
+    // Actions that spawn/consume the targeted node close the modal so the
+    // player sees the result land rather than staring at a stale modal.
+    if (actionId === 'catalyse' || actionId === 'discard' || actionId === 'harvest') {
+      setModalNodeId(null);
     }
   };
 
@@ -178,6 +175,7 @@ export default function Home() {
             <LabScreen
               tick={tick}
               dish={activeDish}
+              animations={animations}
               level={level}
               xpPercent={0}
               shipmentReady={readyShipment}

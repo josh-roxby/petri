@@ -1,4 +1,5 @@
 import React from 'react';
+import { AnimOverlay } from './AnimOverlay';
 import { Porthole } from './Porthole';
 import { PetriDish } from './PetriDish';
 import { CHROME, MONO } from '@/lib/tokens';
@@ -18,6 +19,7 @@ import { CHROME, MONO } from '@/lib/tokens';
 export function LabScreen({
   tick,
   dish,
+  animations = [],
   level = 1,
   xpPercent = 0,
   shipmentReady = null,
@@ -142,6 +144,7 @@ export function LabScreen({
       >
         <Porthole>
           <PetriDish tick={tick} nodes={dish.nodes} onNodeTap={onNodeTap} />
+          <AnimOverlay animations={animations} nodes={dish.nodes} />
         </Porthole>
 
         {/* dish stats — sits just below the porthole, moves with it */}

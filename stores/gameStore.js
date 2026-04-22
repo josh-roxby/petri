@@ -173,22 +173,33 @@ export const useGameStore = create((set, get) => ({
     const state = get();
     const dish = findDish(state, dishId);
     const node = findNode(dish, nodeId);
-    if (!node) return false;
-    if (state.materials.stabiliser <= 0) return false;
-    if (node.volatility <= 0) return false;
+    if (!node) return { ok: false };
+    if (state.materials.stabiliser <= 0) return { ok: false };
+    if (node.volatility <= 0) return { ok: false };
     if (node.state === 'scar' || node.state === 'harvested' || node.state === 'contained') {
-      return false;
+      return { ok: false };
     }
+
+    const newVol = clamp(node.volatility - STABILISE_REDUCTION, 0, 100);
+    const crossedIntoStable = node.volatility > 0 && newVol <= 0;
 
     set((s) => ({
       materials: decrementMaterial(s.materials, 'stabiliser'),
-      ...patchNode(s, dishId, nodeId, (n) => {
-        const newVol = clamp(n.volatility - STABILISE_REDUCTION, 0, 100);
-        return { ...n, volatility: newVol, state: stateFromVolatility(newVol, n.state) };
-      }),
+      ...patchNode(s, dishId, nodeId, (n) => ({
+        ...n,
+        volatility: newVol,
+        state: stateFromVolatility(newVol, n.state),
+      })),
     }));
     get().save();
-    return true;
+    // Stabilise always micro-rings. First touchdown to 0 adds the full
+    // stable-reward triplet (S1+S2+S3) since the anim spec allows them to
+    // run concurrently on the same node.
+    const events = [{ type: 'T1', nodeId }];
+    if (crossedIntoStable) {
+      events.push({ type: 'S1', nodeId }, { type: 'S2', nodeId }, { type: 'S3', nodeId });
+    }
+    return { ok: true, events };
   },
 
   /**
@@ -199,10 +210,10 @@ export const useGameStore = create((set, get) => ({
     const state = get();
     const dish = findDish(state, dishId);
     const node = findNode(dish, nodeId);
-    if (!node) return false;
-    if (state.materials.ingredient <= 0) return false;
+    if (!node) return { ok: false };
+    if (state.materials.ingredient <= 0) return { ok: false };
     if (node.state === 'scar' || node.state === 'harvested' || node.state === 'contained') {
-      return false;
+      return { ok: false };
     }
 
     set((s) => {
@@ -226,7 +237,7 @@ export const useGameStore = create((set, get) => ({
       };
     });
     get().save();
-    return true;
+    return { ok: true, events: [{ type: 'T2', nodeId }] };
   },
 
   /**
@@ -237,10 +248,12 @@ export const useGameStore = create((set, get) => ({
     const state = get();
     const dish = findDish(state, dishId);
     const node = findNode(dish, nodeId);
-    if (!node) return false;
+    if (!node) return { ok: false };
     const alreadyContained = node.state === 'contained';
-    if (!alreadyContained && state.materials.plasmaGel <= 0) return false;
-    if (!alreadyContained && (node.state === 'scar' || node.state === 'harvested')) return false;
+    if (!alreadyContained && state.materials.plasmaGel <= 0) return { ok: false };
+    if (!alreadyContained && (node.state === 'scar' || node.state === 'harvested')) {
+      return { ok: false };
+    }
 
     set((s) => ({
       materials: alreadyContained ? s.materials : decrementMaterial(s.materials, 'plasmaGel'),
@@ -251,7 +264,11 @@ export const useGameStore = create((set, get) => ({
       ),
     }));
     get().save();
-    return true;
+    // T3 frost fires on containment only — releasing shouldn't replay it.
+    return {
+      ok: true,
+      events: alreadyContained ? [] : [{ type: 'T3', nodeId }],
+    };
   },
 
   /**
@@ -262,9 +279,9 @@ export const useGameStore = create((set, get) => ({
     const state = get();
     const dish = findDish(state, dishId);
     const node = findNode(dish, nodeId);
-    if (!node) return false;
-    if (state.materials.bioFuel <= 0) return false;
-    if (node.state === 'scar') return false;
+    if (!node) return { ok: false };
+    if (state.materials.bioFuel <= 0) return { ok: false };
+    if (node.state === 'scar') return { ok: false };
 
     set((s) => ({
       materials: decrementMaterial(s.materials, 'bioFuel'),
@@ -279,7 +296,7 @@ export const useGameStore = create((set, get) => ({
       })),
     }));
     get().save();
-    return true;
+    return { ok: true, events: [{ type: 'T4', nodeId }] };
   },
 
   /**
@@ -290,8 +307,8 @@ export const useGameStore = create((set, get) => ({
     const state = get();
     const dish = findDish(state, dishId);
     const node = findNode(dish, nodeId);
-    if (!node) return false;
-    if (node.state === 'scar' || node.state === 'harvested') return false;
+    if (!node) return { ok: false };
+    if (node.state === 'scar' || node.state === 'harvested') return { ok: false };
 
     const outcome = harvestOutcome(node);
 
@@ -308,7 +325,11 @@ export const useGameStore = create((set, get) => ({
       ),
     }));
     get().save();
-    return outcome;
+    // H1 always on success. SH1 only on stable one-shot (node transitions to stub).
+    const events = [];
+    if (outcome.success) events.push({ type: 'H1', nodeId });
+    if (outcome.consumed) events.push({ type: 'SH1', nodeId });
+    return { ok: true, events, outcome };
   },
 
   /**

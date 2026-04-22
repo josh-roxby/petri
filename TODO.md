@@ -4,14 +4,14 @@ Running task list for Petri. Organised by build pass (see `petri-spec.md` §14).
 
 ## Now (Pass 1 — next up)
 
-All four non-Lab screens are live. Remaining Pass 1 work:
+Core animations are in. Remaining Pass 1 work:
 
-- [ ] **Animations** (anim spec Tier 1 + micro): S1/S2/S3 stable, C1 collapse, H1 harvest, SH1 shipment, T1–T4 action micros
 - [ ] Drag-ingredient-onto-node mutation path (currently only Catalyse spawns children)
 - [ ] Tap-tap combine (two-parent mutation)
 - [ ] Chaos multi-child / no-child rolls on Catalyse
 - [ ] Discard collateral (chaos-scaled neighbour volatility spike) — placeholder exists
 - [ ] Action cooldowns (short/medium per spec §3 table)
+- [ ] Fire C1 for online collapses (currently only offline collapses run; passive re-sim could surface them)
 
 ## Next (Pass 1 — playable core loop)
 
@@ -77,16 +77,17 @@ Goal of pass: prove the loop feels good. Single petri, single dish slot, no econ
 
 **Animations (from anim spec — Tier 1 + T1–T4 micro)**
 
-- [ ] S1 stable pulse rings
-- [ ] S2 stable circle + diamond grid (clipPath)
-- [ ] S3 stable edge ripple (bezier-traced)
-- [ ] V1 volatile erratic jitter (ambient state)
-- [ ] C1 collapse shockwave
-- [ ] H1 harvest particle burst
-- [ ] T1 stabilise micro
-- [ ] T2 catalyse spark
-- [ ] T3 contain frost (seed-matched clipPath)
-- [ ] T4 discard burn
+- [x] S1 stable pulse rings
+- [x] S2 stable circle + diamond grid (clipPath)
+- [x] S3 stable edge ripple (bezier-traced)
+- [x] V1 volatile erratic jitter (ambient state in PetriDish, shipped with Lab slice)
+- [x] C1 collapse shockwave (renderer live; fires on online collapse once that lands)
+- [x] H1 harvest particle burst
+- [x] SH1 harvested stub fade (fires on stable harvest consumption)
+- [x] T1 stabilise micro
+- [x] T2 catalyse spark
+- [x] T3 contain frost (seed-matched clipPath)
+- [x] T4 discard burn
 
 ## Later (Pass 2 — economy)
 
@@ -158,6 +159,7 @@ _Reference `petri-spec.md` §16. These can be stubbed during Pass 1 and tuned la
 - [x] **2026-04-22** — Pass 1 game logic: `lib/gameLogic.js` pure helpers (inheritance, harvest formula, state transitions, child spawn). Store actions now mutate real state with material consumption. Modal buttons disable on insufficient material. localStorage save throttled per action.
 - [x] **2026-04-22** — Pass 1 offline sim: `lib/timeDelta.js` (shipment accrual, collapse rolls for volatile nodes). `ShipmentsScreen` with queue + collect + countdown. `WhileAwayModal` surfaces offline changes. `GeomIcon` shared component. Passive re-sim every 30s. Lab floating shipment card wired to live queues.
 - [x] **2026-04-22** — Pass 1 inventory + discoveries: `InventoryScreen` (Compounds / Materials tabs), `DiscoveriesScreen` (3-col grid + detail panel, dashed placeholder slots). Shared `BlobIcon` and `Pill` components. Journal seeded from starting dish + `recordDiscovery` dedup on catalyse with `hashNameSeed` for stable blob shapes across screens.
+- [x] **2026-04-22** — Pass 1 animations: 10 renderers (S1/S2/S3 stable, C1 collapse, H1 + SH1 harvest, T1–T4 micros) in `components/lab/animations.jsx`. `lib/useAnimations.js` drives a self-starting/stopping rAF loop (idle at zero cost when no anims are live). `AnimOverlay` sits above PetriDish in the Porthole clip with `pointerEvents:none`. Store actions return `{ok, events}` and the page fires them. Stabilise micro (T1) always; first touchdown to vol 0 also triggers the S1+S2+S3 reward triplet. Harvest fires H1 on success + SH1 additionally when stable one-shot consumed.
 
 ---
 
