@@ -1,4 +1,5 @@
 import { Chakra_Petch, Space_Mono } from 'next/font/google';
+import { ServiceWorkerRegistrar } from '@/components/shell/ServiceWorkerRegistrar';
 import './globals.css';
 
 const spaceMono = Space_Mono({
@@ -34,7 +35,10 @@ export const viewport = {
 export default function RootLayout({ children }) {
   return (
     <html lang="en" className={`${spaceMono.variable} ${chakraPetch.variable}`}>
-      <body>{children}</body>
+      <body>
+        {children}
+        <ServiceWorkerRegistrar />
+      </body>
     </html>
   );
 }
